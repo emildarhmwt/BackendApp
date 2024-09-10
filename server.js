@@ -11,7 +11,7 @@ app.use(bodyParser.json());
 const pool = new Pool({
     user: 'postgres',
     host: 'localhost',
-    database: 'AplikasiReport',
+    database: 'Aplikasi',
     password: 'emilda123',
     port: 5432,
 });
@@ -20,86 +20,6 @@ const pool = new Pool({
 app.get('/', (req, res) => {
     res.send('Hello World!');
 });
-
-// Route untuk mendapatkan semua reports
-// app.get('/reports', async (req, res) => {
-//     try {
-//         const result = await pool.query(`
-//             SELECT 
-//                 or.id as operation_id, 
-//                 or.tanggal, 
-//                 or.shift, 
-//                 or.grup, 
-//                 or.pengawas, 
-//                 or.lokasi, 
-//                 or.status, 
-//                 or.pic,
-//                 COALESCE(json_agg(
-//                     json_build_object(
-//                         'id', pr.id,
-//                         'alat', pr.alat,
-//                         'timbunan', pr.timbunan,
-//                         'material', pr.material,
-//                         'jarak', pr.jarak,
-//                         'tipe', pr.tipe,
-//                         'ritase', pr.ritase
-//                     ) 
-//                     ORDER BY pr.id
-//                 ) FILTER (WHERE pr.id IS NOT NULL), '[]') as productions
-//             FROM operation_report or
-//             LEFT JOIN production_report pr ON or.id = pr.operation_report_id
-//             GROUP BY or.id
-//             ORDER BY or.tanggal DESC
-//         `);
-//         res.json(result.rows);
-//     } catch (error) {
-//         console.error('Error fetching data', error);
-//         res.status(500).send('Server error');
-//     }
-// });
-
-// // Route untuk mendapatkan satu report berdasarkan ID
-// app.get('/reports/:id', async (req, res) => {
-//     const id = parseInt(req.params.id);
-//     try {
-//         const result = await pool.query(`
-//             SELECT 
-//                 or.id as operation_id, 
-//                 or.tanggal, 
-//                 or.shift, 
-//                 or.grup, 
-//                 or.pengawas, 
-//                 or.lokasi, 
-//                 or.status, 
-//                 or.pic,
-//                 COALESCE(json_agg(
-//                     json_build_object(
-//                         'id', pr.id,
-//                         'alat', pr.alat,
-//                         'timbunan', pr.timbunan,
-//                         'material', pr.material,
-//                         'jarak', pr.jarak,
-//                         'tipe', pr.tipe,
-//                         'ritase', pr.ritase
-//                     ) 
-//                     ORDER BY pr.id
-//                 ) FILTER (WHERE pr.id IS NOT NULL), '[]') as productions
-//             FROM operation_report or
-//             LEFT JOIN production_report pr ON or.id = pr.operation_report_id
-//             WHERE or.id = $1
-//             GROUP BY or.id
-//         `, [id]);
-        
-//         if (result.rows.length === 0) {
-//             return res.status(404).send('Report not found');
-//         }
-        
-//         res.json(result.rows[0]);
-//     } catch (error) {
-//         console.error('Error fetching data', error);
-//         res.status(500).send('Server error');
-//     }
-// });
 
 // Route to get data
 app.get('/reports', async (req, res) => {
@@ -126,6 +46,11 @@ app.post('/operation-reports', async (req, res) => {
             throw new Error('Data operasi tidak lengkap');
         }
 
+        // Validasi status
+        if (status !== 'PRODUCTION' && status !== 'HOUR_METER') {
+            throw new Error('Status harus berupa "PRODUCTION" atau "HOUR_METER"');
+        }
+
         const operationResult = await client.query(
             'INSERT INTO operation_report(tanggal, shift, grup, pengawas, lokasi, status, pic) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id',
             [tanggal, shift, grup, pengawas, lokasi, status, pic]
@@ -134,7 +59,7 @@ app.post('/operation-reports', async (req, res) => {
         const operationReportId = operationResult.rows[0].id;
         
         await client.query('COMMIT');
-        res.status(201).json({ message: 'Operation report created successfully', operationReportId });
+        res.status(201).json({ message: 'Operation report created successfully', operationReportId,  status });
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Error inserting operation data', error);
@@ -169,9 +94,12 @@ app.post('/production-reports', async (req, res) => {
         }
 
         // Periksa apakah operation_report_id valid
-        const operationCheck = await client.query('SELECT id FROM operation_report WHERE id = $1', [operation_report_id]);
+        const operationCheck = await client.query('SELECT id, status FROM operation_report WHERE id = $1', [operation_report_id]);
         if (operationCheck.rows.length === 0) {
             throw new Error('Operation report dengan ID tersebut tidak ditemukan');
+        }
+        if (operationCheck.rows[0].status !== 'PRODUCTION') {
+            throw new Error('Operation report ini bukan untuk production');
         }
 
         const result = await client.query(
@@ -181,6 +109,70 @@ app.post('/production-reports', async (req, res) => {
         
         await client.query('COMMIT');
         res.status(201).json({ message: 'Production report berhasil dibuat', id: result.rows[0].id });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error saat menyisipkan data produksi:', error);
+        res.status(400).json({ error: error.message || 'Terjadi kesalahan saat menyimpan data produksi' });
+    } finally {
+        client.release();
+    }
+});
+
+app.post('/hourmeter-reports', async (req, res) => {
+    console.log('Received production report data:', req.body);
+    const {operation_report_id, equipment, hm_awal, hm_akhir, jam_lain, breakdown, no_operator, hujan, ket} = req.body;
+    
+    const client = await pool.connect();
+    
+    try {
+        await client.query('BEGIN');
+        
+        // Validasi input
+        const missingFields = [];
+        if (!operation_report_id) missingFields.push('operation_report_id');
+        if (!equipment) missingFields.push('equipment');
+        if (hm_awal  === undefined) missingFields.push('hm_awal');
+        if (hm_akhir === undefined) missingFields.push('hm_akhir');
+        if (jam_lain === undefined) missingFields.push('jam_lain');
+        if (breakdown === undefined) missingFields.push('breakdown');
+        if (no_operator === undefined) missingFields.push('no_operator');
+        if (hujan === undefined) missingFields.push('hujan');
+        if (ket === undefined) missingFields.push('ket');
+
+        if (missingFields.length > 0) {
+            throw new Error(`Data hour meter tidak lengkap. Field yang hilang: ${missingFields.join(', ')}`);
+        }
+
+        // Validasi tipe data
+        if (typeof equipment !== 'string' || equipment.length > 100) {
+            throw new Error('Equipment harus berupa string dengan panjang maksimal 100 karakter');
+        }
+        if (typeof ket !== 'string' || ket.length > 100) {
+            throw new Error('Ket harus berupa string dengan panjang maksimal 100 karakter');
+        }
+        const doubleFields = ['hm_awal', 'hm_akhir', 'jam_lain', 'breakdown', 'no_operator', 'hujan'];
+        for (const field of doubleFields) {
+            if (isNaN(parseFloat(req.body[field]))) {
+                throw new Error(`${field} harus berupa angka`);
+            }
+        }
+
+        // Periksa apakah operation_report_id valid
+        const operationCheck = await client.query('SELECT id, status FROM operation_report WHERE id = $1', [operation_report_id]);
+        if (operationCheck.rows.length === 0) {
+            throw new Error('Operation report dengan ID tersebut tidak ditemukan');
+        }
+
+        const result = await client.query(
+            'INSERT INTO hourmeter_report(operation_report_id, equipment, hm_awal, hm_akhir, jam_lain, breakdown, no_operator, hujan, ket) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
+            [operation_report_id, equipment, hm_awal, hm_akhir, jam_lain, breakdown, no_operator, hujan, ket]
+        );
+        if (operationCheck.rows[0].status !== 'HOUR_METER') {
+            throw new Error('Operation report ini bukan untuk hour meter');
+        }
+        
+        await client.query('COMMIT');
+        res.status(201).json({ message: 'Hour Meter report berhasil dibuat', id: result.rows[0].id });
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Error saat menyisipkan data produksi:', error);
