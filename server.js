@@ -22,79 +22,90 @@ app.get('/', (req, res) => {
 });
 
 // Route untuk mendapatkan semua reports
+// app.get('/reports', async (req, res) => {
+//     try {
+//         const result = await pool.query(`
+//             SELECT 
+//                 or.id as operation_id, 
+//                 or.tanggal, 
+//                 or.shift, 
+//                 or.grup, 
+//                 or.pengawas, 
+//                 or.lokasi, 
+//                 or.status, 
+//                 or.pic,
+//                 COALESCE(json_agg(
+//                     json_build_object(
+//                         'id', pr.id,
+//                         'alat', pr.alat,
+//                         'timbunan', pr.timbunan,
+//                         'material', pr.material,
+//                         'jarak', pr.jarak,
+//                         'tipe', pr.tipe,
+//                         'ritase', pr.ritase
+//                     ) 
+//                     ORDER BY pr.id
+//                 ) FILTER (WHERE pr.id IS NOT NULL), '[]') as productions
+//             FROM operation_report or
+//             LEFT JOIN production_report pr ON or.id = pr.operation_report_id
+//             GROUP BY or.id
+//             ORDER BY or.tanggal DESC
+//         `);
+//         res.json(result.rows);
+//     } catch (error) {
+//         console.error('Error fetching data', error);
+//         res.status(500).send('Server error');
+//     }
+// });
+
+// // Route untuk mendapatkan satu report berdasarkan ID
+// app.get('/reports/:id', async (req, res) => {
+//     const id = parseInt(req.params.id);
+//     try {
+//         const result = await pool.query(`
+//             SELECT 
+//                 or.id as operation_id, 
+//                 or.tanggal, 
+//                 or.shift, 
+//                 or.grup, 
+//                 or.pengawas, 
+//                 or.lokasi, 
+//                 or.status, 
+//                 or.pic,
+//                 COALESCE(json_agg(
+//                     json_build_object(
+//                         'id', pr.id,
+//                         'alat', pr.alat,
+//                         'timbunan', pr.timbunan,
+//                         'material', pr.material,
+//                         'jarak', pr.jarak,
+//                         'tipe', pr.tipe,
+//                         'ritase', pr.ritase
+//                     ) 
+//                     ORDER BY pr.id
+//                 ) FILTER (WHERE pr.id IS NOT NULL), '[]') as productions
+//             FROM operation_report or
+//             LEFT JOIN production_report pr ON or.id = pr.operation_report_id
+//             WHERE or.id = $1
+//             GROUP BY or.id
+//         `, [id]);
+        
+//         if (result.rows.length === 0) {
+//             return res.status(404).send('Report not found');
+//         }
+        
+//         res.json(result.rows[0]);
+//     } catch (error) {
+//         console.error('Error fetching data', error);
+//         res.status(500).send('Server error');
+//     }
+// });
+
+// Route to get data
 app.get('/reports', async (req, res) => {
     try {
-        const result = await pool.query(`
-            SELECT 
-                or.id as operation_id, 
-                or.tanggal, 
-                or.shift, 
-                or.grup, 
-                or.pengawas, 
-                or.lokasi, 
-                or.status, 
-                or.pic,
-                COALESCE(json_agg(
-                    json_build_object(
-                        'id', pr.id,
-                        'alat', pr.alat,
-                        'timbunan', pr.timbunan,
-                        'material', pr.material,
-                        'jarak', pr.jarak,
-                        'tipe', pr.tipe,
-                        'ritase', pr.ritase
-                    ) 
-                    ORDER BY pr.id
-                ) FILTER (WHERE pr.id IS NOT NULL), '[]') as productions
-            FROM operation_report or
-            LEFT JOIN production_report pr ON or.id = pr.operation_report_id
-            GROUP BY or.id
-            ORDER BY or.tanggal DESC
-        `);
+        const result = await pool.query('SELECT * FROM operation_report');
         res.json(result.rows);
-    } catch (error) {
-        console.error('Error fetching data', error);
-        res.status(500).send('Server error');
-    }
-});
-
-// Route untuk mendapatkan satu report berdasarkan ID
-app.get('/reports/:id', async (req, res) => {
-    const id = parseInt(req.params.id);
-    try {
-        const result = await pool.query(`
-            SELECT 
-                or.id as operation_id, 
-                or.tanggal, 
-                or.shift, 
-                or.grup, 
-                or.pengawas, 
-                or.lokasi, 
-                or.status, 
-                or.pic,
-                COALESCE(json_agg(
-                    json_build_object(
-                        'id', pr.id,
-                        'alat', pr.alat,
-                        'timbunan', pr.timbunan,
-                        'material', pr.material,
-                        'jarak', pr.jarak,
-                        'tipe', pr.tipe,
-                        'ritase', pr.ritase
-                    ) 
-                    ORDER BY pr.id
-                ) FILTER (WHERE pr.id IS NOT NULL), '[]') as productions
-            FROM operation_report or
-            LEFT JOIN production_report pr ON or.id = pr.operation_report_id
-            WHERE or.id = $1
-            GROUP BY or.id
-        `, [id]);
-        
-        if (result.rows.length === 0) {
-            return res.status(404).send('Report not found');
-        }
-        
-        res.json(result.rows[0]);
     } catch (error) {
         console.error('Error fetching data', error);
         res.status(500).send('Server error');
@@ -163,13 +174,13 @@ app.post('/production-reports', async (req, res) => {
             throw new Error('Operation report dengan ID tersebut tidak ditemukan');
         }
 
-        await client.query(
-            'INSERT INTO production_report(alat, timbunan, material, jarak, tipe, ritase, operation_report_id) VALUES($1, $2, $3, $4, $5, $6, $7)',
+        const result = await client.query(
+            'INSERT INTO production_report(alat, timbunan, material, jarak, tipe, ritase, operation_report_id) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id',
             [alat, timbunan, material, jarak, tipe, ritase, operation_report_id]
         );
         
         await client.query('COMMIT');
-        res.status(201).json({ message: 'Production report berhasil dibuat' });
+        res.status(201).json({ message: 'Production report berhasil dibuat', id: result.rows[0].id });
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Error saat menyisipkan data produksi:', error);
