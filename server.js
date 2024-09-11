@@ -21,14 +21,52 @@ app.get('/', (req, res) => {
     res.send('Hello World!');
 });
 
-// Route to get data
 app.get('/reports', async (req, res) => {
+    const { status, tanggal, grup, lokasi } = req.query;
+    
     try {
-        const result = await pool.query('SELECT * FROM operation_report');
+        let query;
+        let params = [];
+        let paramCount = 1;
+
+        if (status === 'PRODUCTION') {
+            query = `
+                SELECT op.*, pr.*
+                FROM operation_report op
+                LEFT JOIN production_report pr ON op.id = pr.operation_report_id
+                WHERE op.status = $${paramCount++}
+            `;
+            params.push('PRODUCTION');
+        } else if (status === 'HOUR_METER') {
+            query = `
+                SELECT op.*, hr.*
+                FROM operation_report op
+                LEFT JOIN hourmeter_report hr ON op.id = hr.operation_report_id
+                WHERE op.status = $${paramCount++}
+            `;
+            params.push('HOUR_METER');
+        } else {
+            query = 'SELECT * FROM operation_report WHERE 1=1';
+        }
+
+        if (tanggal) {
+            query += ` AND op.tanggal = $${paramCount++}`;
+            params.push(tanggal);
+        }
+        if (grup) {
+            query += ` AND op.grup ILIKE $${paramCount++}`;
+            params.push(`%${grup}%`);
+        }
+        if (lokasi) {
+            query += ` AND op.lokasi ILIKE $${paramCount++}`;
+            params.push(`%${lokasi}%`);
+        }
+
+        const result = await pool.query(query, params);
         res.json(result.rows);
     } catch (error) {
         console.error('Error fetching data', error);
-        res.status(500).send('Server error');
+        res.status(500).json({ error: 'Server error' });
     }
 });
 
@@ -183,69 +221,69 @@ app.post('/hourmeter-reports', async (req, res) => {
 });
 
 // Route untuk mengupdate report
-app.put('/reports/:id', async (req, res) => {
-    const id = parseInt(req.params.id);
-    const { tanggal, shift, grup, pengawas, lokasi, status, pic, productions } = req.body;
+// app.put('/reports/:id', async (req, res) => {
+//     const id = parseInt(req.params.id);
+//     const { tanggal, shift, grup, pengawas, lokasi, status, pic, productions } = req.body;
     
-    const client = await pool.connect();
+//     const client = await pool.connect();
     
-    try {
-        await client.query('BEGIN');
+//     try {
+//         await client.query('BEGIN');
         
-        await client.query(
-            'UPDATE operation_report SET tanggal = $1, shift = $2, grup = $3, pengawas = $4, lokasi = $5, status = $6, pic = $7 WHERE id = $8',
-            [tanggal, shift, grup, pengawas, lokasi, status, pic, id]
-        );
+//         await client.query(
+//             'UPDATE operation_report SET tanggal = $1, shift = $2, grup = $3, pengawas = $4, lokasi = $5, status = $6, pic = $7 WHERE id = $8',
+//             [tanggal, shift, grup, pengawas, lokasi, status, pic, id]
+//         );
         
-        // Hapus production_report yang lama
-        await client.query('DELETE FROM production_report WHERE operation_report_id = $1', [id]);
+//         // Hapus production_report yang lama
+//         await client.query('DELETE FROM production_report WHERE operation_report_id = $1', [id]);
         
-        // Tambahkan production_report yang baru
-        for (const production of productions) {
-            const { alat, timbunan, material, jarak, tipe, ritase } = production;
-            await client.query(
-                'INSERT INTO production_report(alat, timbunan, material, jarak, tipe, ritase, operation_report_id) VALUES($1, $2, $3, $4, $5, $6, $7)',
-                [alat, timbunan, material, jarak, tipe, ritase, id]
-            );
-        }
+//         // Tambahkan production_report yang baru
+//         for (const production of productions) {
+//             const { alat, timbunan, material, jarak, tipe, ritase } = production;
+//             await client.query(
+//                 'INSERT INTO production_report(alat, timbunan, material, jarak, tipe, ritase, operation_report_id) VALUES($1, $2, $3, $4, $5, $6, $7)',
+//                 [alat, timbunan, material, jarak, tipe, ritase, id]
+//             );
+//         }
         
-        await client.query('COMMIT');
-        res.json({ message: 'Report updated successfully' });
-    } catch (error) {
-        await client.query('ROLLBACK');
-        console.error('Error updating data', error);
-        res.status(500).send('Server error');
-    } finally {
-        client.release();
-    }
-});
+//         await client.query('COMMIT');
+//         res.json({ message: 'Report updated successfully' });
+//     } catch (error) {
+//         await client.query('ROLLBACK');
+//         console.error('Error updating data', error);
+//         res.status(500).send('Server error');
+//     } finally {
+//         client.release();
+//     }
+// });
 
 // Route untuk menghapus report
-app.delete('/reports/:id', async (req, res) => {
-    const id = parseInt(req.params.id);
+// app.delete('/reports/:id', async (req, res) => {
+//     const id = parseInt(req.params.id);
     
-    const client = await pool.connect();
+//     const client = await pool.connect();
     
-    try {
-        await client.query('BEGIN');
+//     try {
+//         await client.query('BEGIN');
         
-        // Hapus production_report terkait
-        await client.query('DELETE FROM production_report WHERE operation_report_id = $1', [id]);
+//         // Hapus production_report terkait
+//         await client.query('DELETE FROM production_report WHERE operation_report_id = $1', [id]);
         
-        // Hapus operation_report
-        await client.query('DELETE FROM operation_report WHERE id = $1', [id]);
+//         // Hapus operation_report
+//         await client.query('DELETE FROM operation_report WHERE id = $1', [id]);
         
-        await client.query('COMMIT');
-        res.status(204).send();
-    } catch (error) {
-        await client.query('ROLLBACK');
-        console.error('Error deleting data', error);
-        res.status(500).send('Server error');
-    } finally {
-        client.release();
-    }
-});
+//         await client.query('COMMIT');
+//         res.status(204).send();
+//     } catch (error) {
+//         await client.query('ROLLBACK');
+//         console.error('Error deleting data', error);
+//         res.status(500).send('Server error');
+//     } finally {
+//         client.release();
+//     }
+// });
 
 app.listen(port, () => {
-    console.log(`Server running at http://192.168.1.45:${port}`);
+    console.log(`Server running at http://192.168.1.69:${port}`);
 });
