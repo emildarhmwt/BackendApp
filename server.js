@@ -3,25 +3,18 @@ const bodyParser = require("body-parser");
 const { Pool } = require("pg");
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = 3000;
 
 app.use(bodyParser.json());
 
 // PostgreSQL connection
-// const pool = new Pool({
-//   user: "postgres",
-//   host: "localhost",
-//   database: "Aplikasi",
-//   password: "emilda123",
-//   port: 5432,
-// });
-
 const pool = new Pool({
-     connectionString: process.env.DATABASE_URL,
-     ssl: {
-       rejectUnauthorized: false
-     }
-   });
+  user: "postgres",
+  host: "localhost",
+  database: "Aplikasi",
+  password: "emilda123",
+  port: 5432,
+});
 
 // Basic route
 app.get("/", (req, res) => {
@@ -383,5 +376,5 @@ app.post("/hourmeter-reports", async (req, res) => {
 // });
 
 app.listen(port, () => {
-     console.log(`Server running on port ${port}`);
-   });
+  console.log(`Server running at http://192.168.1.69:${port}`);
+});
