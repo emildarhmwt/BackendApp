@@ -2,6 +2,7 @@
      - type: web
        name: app-report-backend
        env: node
+       plan: free
        buildCommand: npm run build
        startCommand: npm start
        envVars:
@@ -14,5 +15,4 @@
 
    databases:
      - name: Aplikasi
-       databaseName: Aplikasi
-       user: your-database-user
+       plan: free
