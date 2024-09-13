@@ -23,39 +23,46 @@ app.get("/", (req, res) => {
 
 //Route untuk mengambil data dari database
 app.get("/reports", async (req, res) => {
-  const { status, tanggal, grup, lokasi } = req.query; //mengambil query parameter dari request
+  const { status, startDate, endDate, grup, lokasi } = req.query;
+  console.log("Query params received:", { status, startDate, endDate, grup, lokasi });
 
   try {
-    let query; //variabel untuk menyimpan query SQL
-    let params = []; //array untuk menyimpan parameter query
-    let paramCount = 1; //variabel untuk menghitung jumlah parameter
+    let query;
+    let params = [];
+    let paramCount = 1;
 
-    //membuat query berdasarkan status
     if (status === "PRODUCTION") {
       query = `
-                SELECT op.*, pr.*
-                FROM operation_report op
-                LEFT JOIN production_report pr ON op.id = pr.operation_report_id
-                WHERE op.status = $${paramCount++}
-            `;
+        SELECT op.*, pr.*
+        FROM operation_report op
+        LEFT JOIN production_report pr ON op.id = pr.operation_report_id
+        WHERE op.status = $${paramCount++}
+      `;
       params.push("PRODUCTION");
     } else if (status === "HOUR_METER") {
       query = `
-                SELECT op.*, hr.*
-                FROM operation_report op
-                LEFT JOIN hourmeter_report hr ON op.id = hr.operation_report_id
-                WHERE op.status = $${paramCount++}
-            `;
+        SELECT op.*, hr.*
+        FROM operation_report op
+        LEFT JOIN hourmeter_report hr ON op.id = hr.operation_report_id
+        WHERE op.status = $${paramCount++}
+      `;
       params.push("HOUR_METER");
     } else {
       query = "SELECT * FROM operation_report WHERE 1=1";
     }
 
-    //menambahkan filter berdasarkan tanggal, grup, dan lokasi
-    if (tanggal) {
-      query += ` AND op.tanggal = $${paramCount++}`;
-      params.push(tanggal);
+    // Filter berdasarkan rentang tanggal atau tanggal tunggal
+    if (startDate && endDate) {
+      query += ` AND op.tanggal BETWEEN $${paramCount++} AND $${paramCount++}`;
+      params.push(startDate, endDate);
+    } else if (startDate) {
+      query += ` AND op.tanggal >= $${paramCount++}`;
+      params.push(startDate);
+    } else if (endDate) {
+      query += ` AND op.tanggal <= $${paramCount++}`;
+      params.push(endDate);
     }
+
     if (grup) {
       query += ` AND op.grup ILIKE $${paramCount++}`;
       params.push(`%${grup}%`);
@@ -65,8 +72,12 @@ app.get("/reports", async (req, res) => {
       params.push(`%${lokasi}%`);
     }
 
-    const result = await pool.query(query, params); //mengeksekusi query dan mengambil data dari database
-    res.json(result.rows); //mengirim data yang diambil sebagai response
+    console.log("Final query:", query);
+    console.log("Query params:", params);
+
+    const result = await pool.query(query, params);
+    console.log("Query result count:", result.rows.length);
+    res.json(result.rows);
   } catch (error) {
     console.error("Error fetching data", error);
     res.status(500).json({ error: "Server error" });
