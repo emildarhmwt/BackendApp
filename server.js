@@ -728,6 +728,105 @@ app.delete("/hourmeter-reports/:id", async (req, res) => {
   }
 });
 
+// Route untuk menambahkan admin
+app.post("/admins", async (req, res) => {
+  const { admin_nama, admin_username, admin_password } = req.body; //mengambil data dari body request
+
+  const client = await pool.connect(); //membuat koneksi ke database
+
+  try {
+    await client.query("BEGIN"); //memulai transaksi baru
+
+    // Validasi input
+    if (!admin_nama || !admin_username || !admin_password) {
+      throw new Error("Data admin tidak lengkap");
+    }
+
+    //menambahkan data ke table admin
+    const result = await client.query(
+      "INSERT INTO admin(admin_nama, admin_username, admin_password) VALUES($1, $2, $3) RETURNING admin_id",
+      [admin_nama, admin_username, admin_password]
+    );
+
+    const adminId = result.rows[0].admin_id; //mengambil id dari data yang baru ditambahkan
+
+    await client.query("COMMIT"); //mengakhiri transaksi dan menyimpan perubahan ke database
+    res.status(201).json({
+      message: "Admin berhasil ditambahkan", //mengirim response berhasil
+      adminId,
+    });
+  } catch (error) {
+    await client.query("ROLLBACK"); //membatalkan transaksi jika terjadi error
+    console.error("Error inserting admin data", error); //menampilkan error jika terjadi error
+    res.status(400).json({
+      error: error.message || "Terjadi kesalahan saat menyimpan data admin",
+    });
+  } finally {
+    client.release(); //mengakhiri koneksi ke database
+  }
+});
+
+app.get("/admins", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM admin");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching admin data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data admin",
+    });
+  }
+});
+
+// Route untuk menambahkan user
+app.post("/users", async (req, res) => {
+  const { user_nama, user_username, user_password } = req.body; //mengambil data dari body request
+
+  const client = await pool.connect(); //membuat koneksi ke database
+
+  try {
+    await client.query("BEGIN"); //memulai transaksi baru
+
+    // Validasi input
+    if (!user_nama || !user_username || !user_password) {
+      throw new Error("Data user tidak lengkap");
+    }
+
+    const result = await client.query(
+      "INSERT INTO user_operation(user_nama, user_username, user_password) VALUES($1, $2, $3) RETURNING user_id",
+      [user_nama, user_username, user_password]
+    );
+
+    const userId = result.rows[0].user_id;
+
+    await client.query("COMMIT");
+    res.status(201).json({
+      message: "User berhasil ditambahkan",
+      userId,
+    });
+  } catch (error) {
+    await client.query("ROLLBACK"); 
+    console.error("Error inserting user data", error); 
+    res.status(400).json({
+      error: error.message || "Terjadi kesalahan saat menyimpan data user",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+app.get("/users", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM user_operation");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching user data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data user",
+    });
+  }
+});
+
 console.log("Registered routes:");
 app._router.stack.forEach(function (r) {
   if (r.route && r.route.path) {
@@ -736,5 +835,5 @@ app._router.stack.forEach(function (r) {
 });
 
 app.listen(port, () => {
-  console.log(`Server running at http://192.168.100.129:${port}`);
+  console.log(`Server running at http://192.168.1.58:${port}`);
 });
