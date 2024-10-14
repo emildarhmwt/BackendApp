@@ -108,11 +108,9 @@ app.get("/operation-reports", async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error("Error fetching operation reports", error);
-    res
-      .status(500)
-      .json({
-        error: "Terjadi kesalahan saat mengambil data operation report",
-      });
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data operation report",
+    });
   }
 });
 
@@ -139,11 +137,9 @@ app.get("/operation-reports/:id", async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error("Error fetching operation report", error);
-    res
-      .status(500)
-      .json({
-        error: "Terjadi kesalahan saat mengambil data operation report",
-      });
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data operation report",
+    });
   }
 });
 
@@ -289,15 +285,8 @@ app.get("/reports", async (req, res) => {
 // Route untuk menambahkan production_report
 app.post("/production-reports", async (req, res) => {
   console.log("Received production report data:", req.body); //menampilkan data yang dikirim dari client
-  const {
-    alat,
-    timbunan,
-    material,
-    jarak,
-    tipe,
-    ritase,
-    operation_report_id,
-  } = req.body; //mengambil data dari body request
+  const { alat, timbunan, material, jarak, tipe, ritase, operation_report_id } =
+    req.body; //mengambil data dari body request
 
   const client = await pool.connect(); //membuat koneksi ke database
 
@@ -387,11 +376,9 @@ app.put("/production-reports/:id", async (req, res) => {
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Error updating production data", error);
-    res
-      .status(500)
-      .json({
-        error: "Terjadi kesalahan server saat memperbarui data produksi",
-      });
+    res.status(500).json({
+      error: "Terjadi kesalahan server saat memperbarui data produksi",
+    });
   } finally {
     client.release();
   }
@@ -636,11 +623,9 @@ app.put("/hourmeter-reports/:id", async (req, res) => {
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Error updating hourmeter data", error);
-    res
-      .status(500)
-      .json({
-        error: "Terjadi kesalahan server saat memperbarui data hourmeter",
-      });
+    res.status(500).json({
+      error: "Terjadi kesalahan server saat memperbarui data hourmeter",
+    });
   } finally {
     client.release();
   }
@@ -718,11 +703,9 @@ app.delete("/hourmeter-reports/:id", async (req, res) => {
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Error deleting hourmeter data", error);
-    res
-      .status(500)
-      .json({
-        error: "Terjadi kesalahan server saat menghapus data hourmeter",
-      });
+    res.status(500).json({
+      error: "Terjadi kesalahan server saat menghapus data hourmeter",
+    });
   } finally {
     client.release();
   }
@@ -778,6 +761,90 @@ app.get("/admins", async (req, res) => {
   }
 });
 
+app.put("/admins/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { admin_nama, admin_username, admin_password } = req.body;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Periksa apakah admin dengan ID tersebut ada
+    const checkResult = await client.query(
+      "SELECT * FROM admin WHERE admin_id = $1",
+      [id]
+    );
+    if (checkResult.rows.length === 0) {
+      throw new Error("Admin tidak ditemukan");
+    }
+
+    // Update admin
+    await client.query(
+      "UPDATE admin SET admin_nama = $1, admin_username = $2, admin_password = $3 WHERE admin_id = $4",
+      [admin_nama, admin_username, admin_password, id]
+    );
+
+    await client.query("COMMIT");
+    res.json({ message: "Admin berhasil diperbarui" });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error updating admin data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan server saat memperbarui data admin",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+app.delete("/admins/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  console.log("Attempting to delete admin with ID:", id);
+
+  if (isNaN(id)) {
+    console.error("Invalid ID:", req.params.id);
+    res.status(400).json({ error: "ID admin tidak valid" });
+    return;
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Periksa apakah admin ada
+    const checkResult = await client.query(
+      "SELECT * FROM admin WHERE admin_id = $1",
+      [id]
+    );
+    if (checkResult.rows.length === 0) {
+      console.log("Admin not found in database");
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "Admin tidak ditemukan" });
+      return;
+    }
+
+    // Hapus admin
+    await client.query(
+      "DELETE FROM admin WHERE admin_id = $1",
+      [id]
+    );
+
+    await client.query("COMMIT");
+    console.log("Delete operation successful");
+    res.json({ message: "Admin berhasil dihapus" });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error deleting admin data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan server saat menghapus data admin",
+    });
+  } finally {
+    client.release();
+  }
+});
+
 // Route untuk menambahkan user
 app.post("/users", async (req, res) => {
   const { user_nama, user_username, user_password } = req.body; //mengambil data dari body request
@@ -805,8 +872,8 @@ app.post("/users", async (req, res) => {
       userId,
     });
   } catch (error) {
-    await client.query("ROLLBACK"); 
-    console.error("Error inserting user data", error); 
+    await client.query("ROLLBACK");
+    console.error("Error inserting user data", error);
     res.status(400).json({
       error: error.message || "Terjadi kesalahan saat menyimpan data user",
     });
@@ -827,6 +894,149 @@ app.get("/users", async (req, res) => {
   }
 });
 
+app.put("/users/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const { user_nama, user_username, user_password } = req.body;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Periksa apakah user dengan ID tersebut ada
+    const checkResult = await client.query(
+      "SELECT * FROM user_operation WHERE user_id = $1",
+      [id]
+    );
+    if (checkResult.rows.length === 0) {
+      throw new Error("User tidak ditemukan");
+    }
+
+    // Update user
+    await client.query(
+      "UPDATE user_operation SET user_nama = $1, user_username = $2, user_password = $3 WHERE user_id = $4",
+      [user_nama, user_username, user_password, id]
+    );
+
+    await client.query("COMMIT");
+    res.json({ message: "User berhasil diperbarui" });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error updating user data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan server saat memperbarui data user",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+app.delete("/users/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+  console.log("Attempting to delete user with ID:", id);
+
+  if (isNaN(id)) {
+    console.error("Invalid ID:", req.params.id);
+    res.status(400).json({ error: "ID user tidak valid" });
+    return;
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Periksa apakah user ada
+    const checkResult = await client.query(
+      "SELECT * FROM user_operation WHERE user_id = $1",
+      [id]
+    );
+    if (checkResult.rows.length === 0) {
+      console.log("User not found in database");
+      await client.query("ROLLBACK");
+      res.status(404).json({ error: "User tidak ditemukan" });
+      return;
+    }
+
+    // Hapus user
+    await client.query(
+      "DELETE FROM user_operation WHERE user_id = $1",
+      [id]
+    );
+
+    await client.query("COMMIT");
+    console.log("Delete operation successful");
+    res.json({ message: "User berhasil dihapus" });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error deleting user data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan server saat menghapus data user",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Route untuk login
+app.post("/login", async (req, res) => {
+  const { username, password, role } = req.body; // Mengambil data dari body request
+
+  const client = await pool.connect(); // Membuat koneksi ke database
+
+  try {
+    let query;
+    let params = [username];
+
+    // Memilih query berdasarkan role
+    if (role === "admin") {
+      query = "SELECT * FROM admin WHERE admin_username = $1";
+    } else if (role === "user") {
+      query = "SELECT * FROM user_operation WHERE user_username = $1";
+    } else {
+      return res
+        .status(400)
+        .json({ success: false, message: "Role tidak valid" });
+    }
+
+    const result = await client.query(query, params);
+
+    // Memeriksa apakah pengguna ditemukan
+    if (result.rows.length === 0) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Username atau password salah" });
+    }
+
+    const user = result.rows[0];
+
+    // Validasi password (gunakan bcrypt untuk hashing password di aplikasi nyata)
+    if (role === "admin" && user.admin_password !== password) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Username atau password salah" });
+    } else if (role === "user" && user.user_password !== password) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Username atau password salah" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Login berhasil",
+      userId: user.admin_id || user.user_id, // Mengembalikan ID pengguna
+      role: role,
+    });
+  } catch (error) {
+    console.error("Error during login", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Terjadi kesalahan saat login" });
+  } finally {
+    client.release(); // Mengakhiri koneksi ke database
+  }
+});
+
 console.log("Registered routes:");
 app._router.stack.forEach(function (r) {
   if (r.route && r.route.path) {
@@ -835,5 +1045,5 @@ app._router.stack.forEach(function (r) {
 });
 
 app.listen(port, () => {
-  console.log(`Server running at http://192.168.1.58:${port}`);
+  console.log(`Server running at http://192.168.1.68:${port}`);
 });
