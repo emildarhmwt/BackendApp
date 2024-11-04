@@ -33,6 +33,18 @@ app.get("/users", async (req, res) => {
   }
 });
 
+   app.get("/muatan", async (req, res) => {
+     try {
+       const result = await pool.query("SELECT id, tipe, jumlah FROM muatan");
+       res.json(result.rows);
+     } catch (error) {
+       console.error("Error fetching user data", error);
+       res.status(500).json({
+         error: "Terjadi kesalahan saat mengambil data muatan",
+       });
+     }
+   });
+
 // Route untuk menambahkan operation_report
 app.post("/operation-reports", async (req, res) => {
   const { tanggal, shift, grup, pengawas, lokasi, status, pic } = req.body; //mengambil data dari body request
@@ -56,8 +68,8 @@ app.post("/operation-reports", async (req, res) => {
     }
 
     // Validasi status
-    if (status !== "PRODUCTION" && status !== "HOUR_METER") {
-      throw new Error('Status harus berupa "PRODUCTION" atau "HOUR_METER"');
+    if (status !== "Produksi" && status !== "Jam Jalan") {
+      throw new Error('Status harus berupa "Produksi" atau "Jam Jalan"');
     }
 
     //menambahkan data ke table operation_report
@@ -171,22 +183,22 @@ app.get("/reports", async (req, res) => {
     let params = [];
     let paramCount = 1;
 
-    if (status === "PRODUCTION") {
+    if (status === "Produksi") {
       query = `
         SELECT op.*, pr.*
         FROM operation_report op
         LEFT JOIN production_report pr ON op.id = pr.operation_report_id
         WHERE op.status = $${paramCount++}
       `;
-      params.push("PRODUCTION");
-    } else if (status === "HOUR_METER") {
+      params.push("Produksi");
+    } else if (status === "Jam Jalan") {
       query = `
         SELECT op.*, hr.*
         FROM operation_report op
         LEFT JOIN hourmeter_report hr ON op.id = hr.operation_report_id
         WHERE op.status = $${paramCount++}
       `;
-      params.push("HOUR_METER");
+      params.push("Jam Jalan");
     } else {
       query = "SELECT * FROM operation_report WHERE 1=1";
     }
@@ -262,7 +274,7 @@ app.post("/production-reports", async (req, res) => {
     if (operationCheck.rows.length === 0) {
       throw new Error("Operation report dengan ID tersebut tidak ditemukan");
     }
-    if (operationCheck.rows[0].status !== "PRODUCTION") {
+    if (operationCheck.rows[0].status !== "Produksi") {
       throw new Error("Operation report ini bukan untuk production"); //mengecek apakah status operation_report_id adalah production
     }
 
@@ -497,7 +509,7 @@ app.post("/hourmeter-reports", async (req, res) => {
         ket,
       ]
     );
-    if (operationCheck.rows[0].status !== "HOUR_METER") {
+    if (operationCheck.rows[0].status !== "Jam Jalan") {
       throw new Error("Operation report ini bukan untuk hour meter");
     }
 
