@@ -21,6 +21,18 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
+app.get("/users", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, username FROM user_report");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching user data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data user",
+    });
+  }
+});
+
 // Route untuk menambahkan operation_report
 app.post("/operation-reports", async (req, res) => {
   const { tanggal, shift, grup, pengawas, lokasi, status, pic } = req.body; //mengambil data dari body request
