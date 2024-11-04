@@ -1,9 +1,9 @@
 const express = require("express"); // import modul express
 const bodyParser = require("body-parser"); // import modul body-parser
 const { Pool } = require("pg"); // import modul pg(mengelola koneksi ke databse postgresql)
-
 const app = express(); // membuat instance express
 const port = 3000; // port untuk server
+const bcrypt = require('bcrypt');
 
 app.use(bodyParser.json()); // middleware untuk mengurai body request menjadi json
 
@@ -142,76 +142,6 @@ app.get("/operation-reports/:id", async (req, res) => {
     });
   }
 });
-
-// app.put('/operation-reports/:id', async (req, res) => {
-//   const id = parseInt(req.params.id);
-//   const { shift, grup, pengawas, lokasi, pic } = req.body;
-
-//   console.log("Received data:", { id, shift, grup, pengawas, lokasi, pic });
-
-//   const client = await pool.connect();
-
-//   try {
-//     await client.query('BEGIN');
-
-//     // Periksa apakah operation_report dengan ID tersebut ada
-//     const checkResult = await client.query('SELECT * FROM operation_report WHERE id = $1', [id]);
-//     if (checkResult.rows.length === 0) {
-//       throw new Error('Operation report tidak ditemukan');
-//     }
-
-//     const existingStatus = checkResult.rows[0].status;
-//     const existingTanggal = checkResult.rows[0].tanggal;
-
-//     // Update operation_report tanpa mengubah tanggal dan status
-//     const updateQuery = `
-//       UPDATE operation_report
-//       SET shift = $1, grup = $2, pengawas = $3, lokasi = $4, pic = $5
-//       WHERE id = $6
-//       RETURNING *
-//     `;
-//     const updateValues = [shift, grup, pengawas, lokasi, pic, id];
-//     console.log("Update query:", updateQuery);
-//     console.log("Update values:", updateValues);
-
-//     const updateResult = await client.query(updateQuery, updateValues);
-
-//     console.log("Update result:", updateResult.rows[0]);
-
-//     // Update grup dan lokasi di production_report atau hourmeter_report yang terkait
-//     if (existingStatus === 'PRODUCTION') {
-//       await client.query(
-//         'UPDATE production_report SET grup = $1, lokasi = $2 WHERE operation_report_id = $3',
-//         [grup, lokasi, id]
-//       );
-//     } else if (existingStatus === 'HOUR_METER') {
-//       await client.query(
-//         'UPDATE hourmeter_report SET grup = $1, lokasi = $2 WHERE operation_report_id = $3',
-//         [grup, lokasi, id]
-//       );
-//     }
-
-//     await client.query('COMMIT');
-//     res.json({
-//       message: 'Operation report berhasil diperbarui',
-//       updatedReport: {
-//         ...updateResult.rows[0],
-//         tanggal: existingTanggal,
-//         status: existingStatus
-//       }
-//     });
-//   } catch (error) {
-//     await client.query('ROLLBACK');
-//     console.error('Error updating operation data', error);
-//     res.status(500).json({
-//       error: 'Terjadi kesalahan server saat memperbarui data operasi',
-//       details: error.message,
-//       stack: error.stack
-//     });
-//   } finally {
-//     client.release();
-//   }
-// });
 
 //Route untuk mengambil data dari database
 app.get("/reports", async (req, res) => {
@@ -713,7 +643,8 @@ app.delete("/hourmeter-reports/:id", async (req, res) => {
 
 // Route untuk menambahkan admin
 app.post("/admins", async (req, res) => {
-  const { admin_nama, admin_username, admin_password } = req.body; //mengambil data dari body request
+  console.log("Received admin data:", req.body);
+  const { nama, username, password } = req.body; //mengambil data dari body request
 
   const client = await pool.connect(); //membuat koneksi ke database
 
@@ -721,17 +652,17 @@ app.post("/admins", async (req, res) => {
     await client.query("BEGIN"); //memulai transaksi baru
 
     // Validasi input
-    if (!admin_nama || !admin_username || !admin_password) {
+    if (!nama || !username || !password) {
       throw new Error("Data admin tidak lengkap");
     }
 
     //menambahkan data ke table admin
     const result = await client.query(
-      "INSERT INTO admin(admin_nama, admin_username, admin_password) VALUES($1, $2, $3) RETURNING admin_id",
-      [admin_nama, admin_username, admin_password]
+      "INSERT INTO admin_report(nama,username,password) VALUES($1, $2, $3) RETURNING id",
+      [nama,username,password]
     );
 
-    const adminId = result.rows[0].admin_id; //mengambil id dari data yang baru ditambahkan
+    const adminId = result.rows[0].id; //mengambil id dari data yang baru ditambahkan
 
     await client.query("COMMIT"); //mengakhiri transaksi dan menyimpan perubahan ke database
     res.status(201).json({
@@ -751,7 +682,7 @@ app.post("/admins", async (req, res) => {
 
 app.get("/admins", async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM admin");
+    const result = await pool.query("SELECT * FROM admin_report");
     res.json(result.rows);
   } catch (error) {
     console.error("Error fetching admin data", error);
@@ -763,7 +694,13 @@ app.get("/admins", async (req, res) => {
 
 app.put("/admins/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  const { admin_nama, admin_username, admin_password } = req.body;
+
+  // Validate ID
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID tidak valid" });
+  }
+
+  const { nama, username, password } = req.body;
 
   const client = await pool.connect();
 
@@ -772,17 +709,20 @@ app.put("/admins/:id", async (req, res) => {
 
     // Periksa apakah admin dengan ID tersebut ada
     const checkResult = await client.query(
-      "SELECT * FROM admin WHERE admin_id = $1",
+      "SELECT * FROM admin_report WHERE id = $1",
       [id]
     );
     if (checkResult.rows.length === 0) {
       throw new Error("Admin tidak ditemukan");
     }
 
+    // Log the ID being updated
+    console.log("Updating admin with ID:", id);
+
     // Update admin
     await client.query(
-      "UPDATE admin SET admin_nama = $1, admin_username = $2, admin_password = $3 WHERE admin_id = $4",
-      [admin_nama, admin_username, admin_password, id]
+      "UPDATE admin_report SET nama = $1, username = $2, password = $3 WHERE id = $4",
+      [nama, username, password, id]
     );
 
     await client.query("COMMIT");
@@ -800,7 +740,7 @@ app.put("/admins/:id", async (req, res) => {
 
 app.delete("/admins/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  console.log("Attempting to delete admin with ID:", id);
+  console.log("Attempting to delete admin with ID:", id); // Log the ID being deleted
 
   if (isNaN(id)) {
     console.error("Invalid ID:", req.params.id);
@@ -815,9 +755,10 @@ app.delete("/admins/:id", async (req, res) => {
 
     // Periksa apakah admin ada
     const checkResult = await client.query(
-      "SELECT * FROM admin WHERE admin_id = $1",
+      "SELECT * FROM admin_report WHERE id = $1",
       [id]
     );
+    console.log("Check result:", checkResult.rows); // Log the result of the check
     if (checkResult.rows.length === 0) {
       console.log("Admin not found in database");
       await client.query("ROLLBACK");
@@ -827,12 +768,12 @@ app.delete("/admins/:id", async (req, res) => {
 
     // Hapus admin
     await client.query(
-      "DELETE FROM admin WHERE admin_id = $1",
+      "DELETE FROM admin_report WHERE id = $1",
       [id]
     );
 
     await client.query("COMMIT");
-    console.log("Delete operation successful");
+    console.log("Delete admin successful");
     res.json({ message: "Admin berhasil dihapus" });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -847,7 +788,8 @@ app.delete("/admins/:id", async (req, res) => {
 
 // Route untuk menambahkan user
 app.post("/users", async (req, res) => {
-  const { user_nama, user_username, user_password } = req.body; //mengambil data dari body request
+  console.log("Received user data:", req.body);
+  const { nama, username, password } = req.body; //mengambil data dari body request
 
   const client = await pool.connect(); //membuat koneksi ke database
 
@@ -855,16 +797,16 @@ app.post("/users", async (req, res) => {
     await client.query("BEGIN"); //memulai transaksi baru
 
     // Validasi input
-    if (!user_nama || !user_username || !user_password) {
+    if (!nama || !username || !password) {
       throw new Error("Data user tidak lengkap");
     }
 
     const result = await client.query(
-      "INSERT INTO user_operation(user_nama, user_username, user_password) VALUES($1, $2, $3) RETURNING user_id",
-      [user_nama, user_username, user_password]
+      "INSERT INTO user_report(nama, username, password) VALUES($1, $2, $3) RETURNING id",
+      [nama, username, password]
     );
 
-    const userId = result.rows[0].user_id;
+    const userId = result.rows[0].id;
 
     await client.query("COMMIT");
     res.status(201).json({
@@ -884,7 +826,7 @@ app.post("/users", async (req, res) => {
 
 app.get("/users", async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM user_operation");
+    const result = await pool.query("SELECT * FROM user_report");
     res.json(result.rows);
   } catch (error) {
     console.error("Error fetching user data", error);
@@ -896,26 +838,35 @@ app.get("/users", async (req, res) => {
 
 app.put("/users/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  const { user_nama, user_username, user_password } = req.body;
+
+  // Validate ID
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID tidak valid" });
+  }
+
+  const { nama, username, password } = req.body;
 
   const client = await pool.connect();
 
   try {
     await client.query("BEGIN");
 
-    // Periksa apakah user dengan ID tersebut ada
+    // Periksa apakah admin dengan ID tersebut ada
     const checkResult = await client.query(
-      "SELECT * FROM user_operation WHERE user_id = $1",
+      "SELECT * FROM user_report WHERE id = $1",
       [id]
     );
     if (checkResult.rows.length === 0) {
       throw new Error("User tidak ditemukan");
     }
 
-    // Update user
+    // Log the ID being updated
+    console.log("Updating user with ID:", id);
+
+    // Update admin
     await client.query(
-      "UPDATE user_operation SET user_nama = $1, user_username = $2, user_password = $3 WHERE user_id = $4",
-      [user_nama, user_username, user_password, id]
+      "UPDATE user_report SET nama = $1, username = $2, password = $3 WHERE id = $4",
+      [nama, username, password, id]
     );
 
     await client.query("COMMIT");
@@ -933,7 +884,7 @@ app.put("/users/:id", async (req, res) => {
 
 app.delete("/users/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  console.log("Attempting to delete user with ID:", id);
+  console.log("Attempting to delete user with ID:", id); // Log the ID being deleted
 
   if (isNaN(id)) {
     console.error("Invalid ID:", req.params.id);
@@ -946,11 +897,12 @@ app.delete("/users/:id", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // Periksa apakah user ada
+    // Periksa apakah admin ada
     const checkResult = await client.query(
-      "SELECT * FROM user_operation WHERE user_id = $1",
+      "SELECT * FROM user_report WHERE id = $1",
       [id]
     );
+    console.log("Check result:", checkResult.rows); // Log the result of the check
     if (checkResult.rows.length === 0) {
       console.log("User not found in database");
       await client.query("ROLLBACK");
@@ -958,14 +910,14 @@ app.delete("/users/:id", async (req, res) => {
       return;
     }
 
-    // Hapus user
+    // Hapus admin
     await client.query(
-      "DELETE FROM user_operation WHERE user_id = $1",
+      "DELETE FROM user_report WHERE id = $1",
       [id]
     );
 
     await client.query("COMMIT");
-    console.log("Delete operation successful");
+    console.log("Delete user successful");
     res.json({ message: "User berhasil dihapus" });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -980,19 +932,20 @@ app.delete("/users/:id", async (req, res) => {
 
 // Route untuk login
 app.post("/login", async (req, res) => {
-  const { username, password, role } = req.body; // Mengambil data dari body request
+  const { username, password, role } = req.body;
 
-  const client = await pool.connect(); // Membuat koneksi ke database
+  console.log("Login attempt:", { username, password, role });
+
+  const client = await pool.connect();
 
   try {
     let query;
     let params = [username];
 
-    // Memilih query berdasarkan role
     if (role === "admin") {
-      query = "SELECT * FROM admin WHERE admin_username = $1";
+      query = "SELECT * FROM admin_report WHERE username = $1";
     } else if (role === "user") {
-      query = "SELECT * FROM user_operation WHERE user_username = $1";
+      query = "SELECT * FROM user_report WHERE username = $1";
     } else {
       return res
         .status(400)
@@ -1001,7 +954,6 @@ app.post("/login", async (req, res) => {
 
     const result = await client.query(query, params);
 
-    // Memeriksa apakah pengguna ditemukan
     if (result.rows.length === 0) {
       return res
         .status(401)
@@ -1010,12 +962,12 @@ app.post("/login", async (req, res) => {
 
     const user = result.rows[0];
 
-    // Validasi password (gunakan bcrypt untuk hashing password di aplikasi nyata)
-    if (role === "admin" && user.admin_password !== password) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Username atau password salah" });
-    } else if (role === "user" && user.user_password !== password) {
+    // Verifikasi password menggunakan bcrypt
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    console.log("Password valid:", isPasswordValid); // Log hasil verifikasi
+
+    if (!isPasswordValid) {
       return res
         .status(401)
         .json({ success: false, message: "Username atau password salah" });
@@ -1024,7 +976,7 @@ app.post("/login", async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Login berhasil",
-      userId: user.admin_id || user.user_id, // Mengembalikan ID pengguna
+      userId: user.id,
       role: role,
     });
   } catch (error) {
@@ -1033,7 +985,7 @@ app.post("/login", async (req, res) => {
       .status(500)
       .json({ success: false, message: "Terjadi kesalahan saat login" });
   } finally {
-    client.release(); // Mengakhiri koneksi ke database
+    client.release();
   }
 });
 
@@ -1045,5 +997,5 @@ app._router.stack.forEach(function (r) {
 });
 
 app.listen(port, () => {
-  console.log(`Server running at http://192.168.1.68:${port}`);
+  console.log(`Server running at http://192.168.1.74:${port}`);
 });
