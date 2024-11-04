@@ -962,15 +962,14 @@ app.post("/login", async (req, res) => {
 
     const user = result.rows[0];
 
-    // Verifikasi password menggunakan bcrypt
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    // Ambil password yang di-hash dari database dan ubah prefiks $2y$ menjadi $2a$
+    const hashedPassword = user.password.replace('$2y$', '$2a$');
 
-    console.log("Password valid:", isPasswordValid); // Log hasil verifikasi
+    // Bandingkan password yang diinput dengan password yang di-hash
+    const isPasswordValid = await bcrypt.compare(password, hashedPassword);
 
     if (!isPasswordValid) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Username atau password salah" });
+      return res.status(401).json({ success: false, message: "Username atau password salah" });
     }
 
     res.status(200).json({
