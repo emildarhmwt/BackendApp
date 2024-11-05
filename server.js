@@ -110,74 +110,74 @@ app.post("/operation-reports", async (req, res) => {
 });
 
 // Route untuk menampilkan semua data dari operation_report
-app.get("/operation-reports", async (req, res) => {
-  try {
-    const { startDate, endDate, grup, lokasi } = req.query;
-    let query = "SELECT * FROM operation_report WHERE 1=1";
-    const params = [];
-    let paramCount = 1;
+// app.get("/operation-reports", async (req, res) => {
+//   try {
+//     const { startDate, endDate, grup, lokasi } = req.query;
+//     let query = "SELECT * FROM operation_report WHERE 1=1";
+//     const params = [];
+//     let paramCount = 1;
 
-    if (startDate && endDate) {
-      query += ` AND tanggal BETWEEN $${paramCount++} AND $${paramCount++}`;
-      params.push(startDate, endDate);
-    } else if (startDate) {
-      query += ` AND tanggal >= $${paramCount++}`;
-      params.push(startDate);
-    } else if (endDate) {
-      query += ` AND tanggal <= $${paramCount++}`;
-      params.push(endDate);
-    }
+//     if (startDate && endDate) {
+//       query += ` AND tanggal BETWEEN $${paramCount++} AND $${paramCount++}`;
+//       params.push(startDate, endDate);
+//     } else if (startDate) {
+//       query += ` AND tanggal >= $${paramCount++}`;
+//       params.push(startDate);
+//     } else if (endDate) {
+//       query += ` AND tanggal <= $${paramCount++}`;
+//       params.push(endDate);
+//     }
 
-    if (grup) {
-      query += ` AND grup ILIKE $${paramCount++}`;
-      params.push(`%${grup}%`);
-    }
+//     if (grup) {
+//       query += ` AND grup ILIKE $${paramCount++}`;
+//       params.push(`%${grup}%`);
+//     }
 
-    if (lokasi) {
-      query += ` AND lokasi ILIKE $${paramCount++}`;
-      params.push(`%${lokasi}%`);
-    }
+//     if (lokasi) {
+//       query += ` AND lokasi ILIKE $${paramCount++}`;
+//       params.push(`%${lokasi}%`);
+//     }
 
-    query += " ORDER BY tanggal DESC";
+//     query += " ORDER BY tanggal DESC";
 
-    const result = await pool.query(query, params);
-    res.json(result.rows);
-  } catch (error) {
-    console.error("Error fetching operation reports", error);
-    res.status(500).json({
-      error: "Terjadi kesalahan saat mengambil data operation report",
-    });
-  }
-});
+//     const result = await pool.query(query, params);
+//     res.json(result.rows);
+//   } catch (error) {
+//     console.error("Error fetching operation reports", error);
+//     res.status(500).json({
+//       error: "Terjadi kesalahan saat mengambil data operation report",
+//     });
+//   }
+// });
 
 // Route untuk menampilkan data operation_report berdasarkan ID
-app.get("/operation-reports/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
+// app.get("/operation-reports/:id", async (req, res) => {
+//   const id = parseInt(req.params.id);
 
-  if (isNaN(id)) {
-    return res.status(400).json({ error: "ID tidak valid" });
-  }
+//   if (isNaN(id)) {
+//     return res.status(400).json({ error: "ID tidak valid" });
+//   }
 
-  try {
-    const result = await pool.query(
-      "SELECT * FROM operation_report WHERE id = $1",
-      [id]
-    );
+//   try {
+//     const result = await pool.query(
+//       "SELECT * FROM operation_report WHERE id = $1",
+//       [id]
+//     );
 
-    if (result.rows.length === 0) {
-      return res
-        .status(404)
-        .json({ error: "Operation report tidak ditemukan" });
-    }
+//     if (result.rows.length === 0) {
+//       return res
+//         .status(404)
+//         .json({ error: "Operation report tidak ditemukan" });
+//     }
 
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error("Error fetching operation report", error);
-    res.status(500).json({
-      error: "Terjadi kesalahan saat mengambil data operation report",
-    });
-  }
-});
+//     res.json(result.rows[0]);
+//   } catch (error) {
+//     console.error("Error fetching operation report", error);
+//     res.status(500).json({
+//       error: "Terjadi kesalahan saat mengambil data operation report",
+//     });
+//   }
+// });
 
 //Route untuk mengambil data dari database
 app.get("/reports", async (req, res) => {
@@ -280,9 +280,9 @@ app.post("/production-reports", async (req, res) => {
   } = req.body; //mengambil data dari body request
 
   const calculatedTotalRitase = ritase + ritase2; // totalRitase merupakan hasil dari ritase + ritase
-  const calculatedVolume = ritase * muatan; // volume hasil dari ritase * muatan
-  const calculatedVolume2 = ritase2 * muatan2; // volume2 hasil dari ritase2 * muatan2
-  const calculatedTotalVolume = calculatedVolume + calculatedVolume2; // totalVolume hasil dari volume + volume2
+  const calculatedVolume = parseFloat((ritase * muatan).toFixed(2)); // volume hasil dari ritase * muatan
+  const calculatedVolume2 = parseFloat((ritase2 * muatan2).toFixed(2)); // volume2 hasil dari ritase2 * muatan2
+  const calculatedTotalVolume = parseFloat((calculatedVolume + calculatedVolume2).toFixed(2)); // totalVolume hasil dari volume + volume2
 
   const client = await pool.connect(); //membuat koneksi ke database
 
