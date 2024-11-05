@@ -3,7 +3,7 @@ const bodyParser = require("body-parser"); // import modul body-parser
 const { Pool } = require("pg"); // import modul pg(mengelola koneksi ke databse postgresql)
 const app = express(); // membuat instance express
 const port = 3000; // port untuk server
-const bcrypt = require('bcrypt');
+const bcrypt = require("bcrypt");
 
 app.use(bodyParser.json()); // middleware untuk mengurai body request menjadi json
 
@@ -33,17 +33,29 @@ app.get("/users", async (req, res) => {
   }
 });
 
-   app.get("/muatan", async (req, res) => {
-     try {
-       const result = await pool.query("SELECT id, tipe, jumlah FROM muatan");
-       res.json(result.rows);
-     } catch (error) {
-       console.error("Error fetching user data", error);
-       res.status(500).json({
-         error: "Terjadi kesalahan saat mengambil data muatan",
-       });
-     }
-   });
+app.get("/muatan", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, tipe, jumlah FROM muatan");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching user data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data muatan",
+    });
+  }
+});
+
+app.get("/equipment", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, equipment, tipe_unit FROM equipment");
+    res.json(result.rows); // Send the fetched equipment data
+  } catch (error) {
+    console.error("Error fetching equipment data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data equipment",
+    });
+  }
+});
 
 // Route untuk menambahkan operation_report
 app.post("/operation-reports", async (req, res) => {
@@ -239,8 +251,38 @@ app.get("/reports", async (req, res) => {
 // Route untuk menambahkan production_report
 app.post("/production-reports", async (req, res) => {
   console.log("Received production report data:", req.body); //menampilkan data yang dikirim dari client
-  const { alat, timbunan, material, jarak, tipe, ritase, operation_report_id } =
-    req.body; //mengambil data dari body request
+  const {
+    excecutor,
+    alat,
+    timbunan,
+    material,
+    jarak,
+    tipe,
+    ritase,
+    muatan,
+    volume,
+    tipe2,
+    ritase2,
+    muatan2,
+    volume2,
+    totalRitase,
+    totalVolume,
+    prosesAdmin,
+    prosesPengawas,
+    prosesKontraktor,
+    alasanReject,
+    kontraktor,
+    namePengawas,
+    filePengawas,
+    nameKontraktor,
+    fileKontraktor,
+    operation_report_id,
+  } = req.body; //mengambil data dari body request
+
+  const calculatedTotalRitase = ritase + ritase2; // totalRitase merupakan hasil dari ritase + ritase
+  const calculatedVolume = ritase * muatan; // volume hasil dari ritase * muatan
+  const calculatedVolume2 = ritase2 * muatan2; // volume2 hasil dari ritase2 * muatan2
+  const calculatedTotalVolume = calculatedVolume + calculatedVolume2; // totalVolume hasil dari volume + volume2
 
   const client = await pool.connect(); //membuat koneksi ke database
 
@@ -250,12 +292,19 @@ app.post("/production-reports", async (req, res) => {
     // Validasi input
     const missingFields = []; //array untuk menyimpan field yang hilang
     if (!operation_report_id) missingFields.push("operation_report_id"); //mengecek apakah operation_report_id ada
+    if (!excecutor) missingFields.push("excecutor");
     if (!alat) missingFields.push("alat"); //mengecek apakah alat ada
     if (!timbunan) missingFields.push("timbunan"); //mengecek apakah timbunan ada
     if (!material) missingFields.push("material"); //mengecek apakah material ada
     if (jarak === undefined) missingFields.push("jarak"); //mengecek apakah jarak ada
     if (!tipe) missingFields.push("tipe"); //mengecek apakah tipe ada
     if (ritase === undefined) missingFields.push("ritase"); //mengecek apakah ritase ada
+    if (muatan === undefined) missingFields.push("muatan");
+    if (volume === undefined) missingFields.push("volume");
+    if (!tipe2) missingFields.push("tipe2"); //mengecek apakah tipe ada
+    if (ritase2 === undefined) missingFields.push("ritase2"); //mengecek apakah ritase ada
+    if (muatan2 === undefined) missingFields.push("muatan2");
+    if (volume2 === undefined) missingFields.push("volume2");
 
     //mengecek apakah ada field yang hilang
     if (missingFields.length > 0) {
@@ -280,8 +329,26 @@ app.post("/production-reports", async (req, res) => {
 
     //menambahkan data ke table production_report
     const result = await client.query(
-      "INSERT INTO production_report(alat, timbunan, material, jarak, tipe, ritase, operation_report_id) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-      [alat, timbunan, material, jarak, tipe, ritase, operation_report_id]
+      "INSERT INTO production_report(alat, timbunan, material, jarak, tipe, ritase, proses_admin, proses_pengawas, proses_kontraktor, alasan_reject, excecutor, tipe2, ritase2, muatan, volume, total_ritase, kontraktor, muatan2, volume2, total_volume, name_pengawas, file_pengawas, name_kontraktor, file_kontraktor, operation_report_id) VALUES($1, $2, $3, $4, $5, $6, 'Uploaded', null, null, null, $7, $8, $9, $10, $11, $12, null, $13, $14, $15, null, null, null, null, $16) RETURNING id",
+      // Update the number of parameters to match the placeholders
+      [
+        alat,
+        timbunan,
+        material,
+        jarak,
+        tipe,
+        ritase,
+        excecutor,
+        tipe2,
+        ritase2,
+        muatan,
+        calculatedVolume,
+        calculatedTotalRitase,
+        muatan2,
+        calculatedVolume2,
+        calculatedTotalVolume,
+        operation_report_id,
+      ]
     );
 
     await client.query("COMMIT"); //mengakhiri transaksi dan menyimpan perubahan ke database
@@ -431,6 +498,19 @@ app.post("/hourmeter-reports", async (req, res) => {
     no_operator,
     hujan,
     ket,
+    proses_admin,
+    proses_pengawas,
+    proses_kontraktor,
+    alasan_reject,
+    tipe_unit, 
+    total_hm,
+    jam_operasi, 
+    no_order,
+    kontraktor,
+    name_pengawas, 
+    file_pengawas, 
+    name_kontraktor,
+    file_kontraktor,
   } = req.body;
 
   const client = await pool.connect(); //membuat koneksi ke database
@@ -449,6 +529,10 @@ app.post("/hourmeter-reports", async (req, res) => {
     if (no_operator === undefined) missingFields.push("no_operator");
     if (hujan === undefined) missingFields.push("hujan");
     if (ket === undefined) missingFields.push("ket");
+    if (tipe_unit === undefined) missingFields.push("tipe_unit");
+    if (total_hm === undefined) missingFields.push("total_hm");
+    if (jam_operasi === undefined) missingFields.push("jam_operasi");
+    if (no_order === undefined) missingFields.push("no_order");
 
     //mengecek apakah ada field yang hilang
     if (missingFields.length > 0) {
@@ -460,16 +544,16 @@ app.post("/hourmeter-reports", async (req, res) => {
     }
 
     // Validasi tipe data
-    if (typeof equipment !== "string" || equipment.length > 100) {
-      throw new Error(
-        "Equipment harus berupa string dengan panjang maksimal 100 karakter"
-      );
-    }
-    if (typeof ket !== "string" || ket.length > 100) {
-      throw new Error(
-        "Ket harus berupa string dengan panjang maksimal 100 karakter"
-      );
-    }
+    // if (typeof equipment !== "string" || equipment.length > 100) {
+    //   throw new Error(
+    //     "Equipment harus berupa string dengan panjang maksimal 100 karakter"
+    //   );
+    // }
+    // if (typeof ket !== "string" || ket.length > 100) {
+    //   throw new Error(
+    //     "Ket harus berupa string dengan panjang maksimal 100 karakter"
+    //   );
+    // }
 
     //mengecek apakah field yang diinput berupa angka
     const doubleFields = [
@@ -479,6 +563,9 @@ app.post("/hourmeter-reports", async (req, res) => {
       "breakdown",
       "no_operator",
       "hujan",
+      "total_hm",
+      "jam_operasi",
+      "no_order",
     ];
     for (const field of doubleFields) {
       if (isNaN(parseFloat(req.body[field]))) {
@@ -496,7 +583,7 @@ app.post("/hourmeter-reports", async (req, res) => {
     }
 
     const result = await client.query(
-      "INSERT INTO hourmeter_report(operation_report_id, equipment, hm_awal, hm_akhir, jam_lain, breakdown, no_operator, hujan, ket) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id",
+      "INSERT INTO hourmeter_report(operation_report_id, equipment, hm_awal, hm_akhir, jam_lain, breakdown, no_operator, hujan, ket, proses_admin, proses_pengawas, proses_kontraktor, alasan_reject, tipe_unit, total_hm, jam_operasi, no_order, kontraktor, name_pengawas, file_pengawas, name_kontraktor, file_kontraktor) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Uploaded', null, null, null, $10, $11, $12, $13, null, null, null, null, null) RETURNING id",
       [
         operation_report_id,
         equipment,
@@ -507,6 +594,10 @@ app.post("/hourmeter-reports", async (req, res) => {
         no_operator,
         hujan,
         ket,
+        tipe_unit,
+        total_hm,
+        jam_operasi,
+        no_order,
       ]
     );
     if (operationCheck.rows[0].status !== "Jam Jalan") {
@@ -520,9 +611,9 @@ app.post("/hourmeter-reports", async (req, res) => {
     });
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error("Error saat menyisipkan data produksi:", error);
+    console.error("Error saat menyisipkan data jam jalan:", error);
     res.status(400).json({
-      error: error.message || "Terjadi kesalahan saat menyimpan data produksi",
+      error: error.message || "Terjadi kesalahan saat menyimpan data jam jalan",
     });
   } finally {
     client.release();
@@ -683,7 +774,7 @@ app.post("/admins", async (req, res) => {
     //menambahkan data ke table admin
     const result = await client.query(
       "INSERT INTO admin_report(nama,username,password) VALUES($1, $2, $3) RETURNING id",
-      [nama,username,password]
+      [nama, username, password]
     );
 
     const adminId = result.rows[0].id; //mengambil id dari data yang baru ditambahkan
@@ -791,10 +882,7 @@ app.delete("/admins/:id", async (req, res) => {
     }
 
     // Hapus admin
-    await client.query(
-      "DELETE FROM admin_report WHERE id = $1",
-      [id]
-    );
+    await client.query("DELETE FROM admin_report WHERE id = $1", [id]);
 
     await client.query("COMMIT");
     console.log("Delete admin successful");
@@ -935,10 +1023,7 @@ app.delete("/users/:id", async (req, res) => {
     }
 
     // Hapus admin
-    await client.query(
-      "DELETE FROM user_report WHERE id = $1",
-      [id]
-    );
+    await client.query("DELETE FROM user_report WHERE id = $1", [id]);
 
     await client.query("COMMIT");
     console.log("Delete user successful");
@@ -987,13 +1072,15 @@ app.post("/login", async (req, res) => {
     const user = result.rows[0];
 
     // Ambil password yang di-hash dari database dan ubah prefiks $2y$ menjadi $2a$
-    const hashedPassword = user.password.replace('$2y$', '$2a$');
+    const hashedPassword = user.password.replace("$2y$", "$2a$");
 
     // Bandingkan password yang diinput dengan password yang di-hash
     const isPasswordValid = await bcrypt.compare(password, hashedPassword);
 
     if (!isPasswordValid) {
-      return res.status(401).json({ success: false, message: "Username atau password salah" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Username atau password salah" });
     }
 
     res.status(200).json({
@@ -1020,5 +1107,5 @@ app._router.stack.forEach(function (r) {
 });
 
 app.listen(port, () => {
-  console.log(`Server running at http://192.168.1.74:${port}`);
+  console.log(`Server running at http://192.168.1.79:${port}`);
 });
