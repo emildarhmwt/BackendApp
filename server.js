@@ -47,12 +47,110 @@ app.get("/muatan", async (req, res) => {
 
 app.get("/equipment", async (req, res) => {
   try {
-    const result = await pool.query("SELECT id, equipment, tipe_unit FROM equipment");
-    res.json(result.rows); // Send the fetched equipment data
+    const result = await pool.query(
+      "SELECT id, equipment, tipe_unit FROM equipment"
+    );
+    res.json(result.rows);
   } catch (error) {
     console.error("Error fetching equipment data", error);
     res.status(500).json({
       error: "Terjadi kesalahan saat mengambil data equipment",
+    });
+  }
+});
+
+app.get("/lokasi", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, lokasi FROM lokasi");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching lokasi data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data lokasi",
+    });
+  }
+});
+
+app.get("/pengawas", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, nama FROM barcode_pengawas");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data",
+    });
+  }
+});
+
+app.get("/grup", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, grup FROM grup");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data",
+    });
+  }
+});
+
+app.get("/shift", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, shift FROM shift");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data",
+    });
+  }
+});
+
+app.get("/executor", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, executor FROM executor");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data",
+    });
+  }
+});
+
+app.get("/alat", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, alat FROM alat");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data",
+    });
+  }
+});
+
+app.get("/timbunan", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, timbunan FROM timbunan");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data",
+    });
+  }
+});
+
+app.get("/material", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, material FROM material");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data",
     });
   }
 });
@@ -282,7 +380,9 @@ app.post("/production-reports", async (req, res) => {
   const calculatedTotalRitase = ritase + ritase2; // totalRitase merupakan hasil dari ritase + ritase
   const calculatedVolume = parseFloat((ritase * muatan).toFixed(2)); // volume hasil dari ritase * muatan
   const calculatedVolume2 = parseFloat((ritase2 * muatan2).toFixed(2)); // volume2 hasil dari ritase2 * muatan2
-  const calculatedTotalVolume = parseFloat((calculatedVolume + calculatedVolume2).toFixed(2)); // totalVolume hasil dari volume + volume2
+  const calculatedTotalVolume = parseFloat(
+    (calculatedVolume + calculatedVolume2).toFixed(2)
+  ); // totalVolume hasil dari volume + volume2
 
   const client = await pool.connect(); //membuat koneksi ke database
 
@@ -502,13 +602,13 @@ app.post("/hourmeter-reports", async (req, res) => {
     proses_pengawas,
     proses_kontraktor,
     alasan_reject,
-    tipe_unit, 
+    tipe_unit,
     total_hm,
-    jam_operasi, 
+    jam_operasi,
     no_order,
     kontraktor,
-    name_pengawas, 
-    file_pengawas, 
+    name_pengawas,
+    file_pengawas,
     name_kontraktor,
     file_kontraktor,
   } = req.body;
