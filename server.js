@@ -868,9 +868,9 @@ app.get("/admins/:id", async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Admin tidak ditemukan" });
     }
-    res.json(result.rows[0]);
-    console.log("Data yang akan dikirim:", userData);
 
+   const userData = result.rows[0];
+    console.log("Data yang dikirim ke client:", userData);
     res.json(userData);
   } catch (error) {
     console.error("Error fetching admin data", error);
@@ -1205,6 +1205,7 @@ app.post("/login", async (req, res) => {
       success: true,
       message: "Login berhasil",
       userId: user.id,
+      username: user.username,
       role: role,
     });
   } catch (error) {
