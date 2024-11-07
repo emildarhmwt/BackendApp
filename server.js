@@ -856,6 +856,30 @@ app.delete("/hourmeter-reports/:id", async (req, res) => {
   }
 });
 
+app.get("/admins/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "ID tidak valid" });
+  }
+
+  try {
+    const result = await pool.query("SELECT * FROM admin_report WHERE id = $1", [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Admin tidak ditemukan" });
+    }
+    res.json(result.rows[0]);
+    console.log("Data yang akan dikirim:", userData);
+
+    res.json(userData);
+  } catch (error) {
+    console.error("Error fetching admin data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data admin",
+    });
+  }
+});
+
 // Route untuk menambahkan admin
 app.post("/admins", async (req, res) => {
   console.log("Received admin data:", req.body);
@@ -1142,11 +1166,8 @@ app.delete("/users/:id", async (req, res) => {
 // Route untuk login
 app.post("/login", async (req, res) => {
   const { username, password, role } = req.body;
-
   console.log("Login attempt:", { username, password, role });
-
   const client = await pool.connect();
-
   try {
     let query;
     let params = [username];
@@ -1155,6 +1176,8 @@ app.post("/login", async (req, res) => {
       query = "SELECT * FROM admin_report WHERE username = $1";
     } else if (role === "user") {
       query = "SELECT * FROM user_report WHERE username = $1";
+    } else if (role === "kontraktor"){
+      query = "SELECT * FROM kontraktor_report WHERE username = $1"
     } else {
       return res
         .status(400)
@@ -1162,7 +1185,6 @@ app.post("/login", async (req, res) => {
     }
 
     const result = await client.query(query, params);
-
     if (result.rows.length === 0) {
       return res
         .status(401)
@@ -1170,11 +1192,7 @@ app.post("/login", async (req, res) => {
     }
 
     const user = result.rows[0];
-
-    // Ambil password yang di-hash dari database dan ubah prefiks $2y$ menjadi $2a$
     const hashedPassword = user.password.replace("$2y$", "$2a$");
-
-    // Bandingkan password yang diinput dengan password yang di-hash
     const isPasswordValid = await bcrypt.compare(password, hashedPassword);
 
     if (!isPasswordValid) {
@@ -1207,5 +1225,5 @@ app._router.stack.forEach(function (r) {
 });
 
 app.listen(port, () => {
-  console.log(`Server running at http://192.168.1.78:${port}`);
+  console.log(`Server running at http://192.168.1.70:${port}`);
 });
