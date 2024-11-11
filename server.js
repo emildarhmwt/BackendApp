@@ -85,15 +85,26 @@ app.get("/pengawas", async (req, res) => {
 
 app.get("/pengawas-ttd", async (req, res) => {
   try {
-    const result = await pool.query("SELECT id, jabatan, nama, nip, name, file_path FROM barcode_pengawas");
-    
-    // Perbarui file_path agar dapat diakses
-    const dataWithCorrectPath = result.rows.map(row => ({
-      ...row,
-      file_path: row.file_path.replace('../', '/')
-    }));
+    const result = await pool.query(
+      "SELECT id, jabatan, nama, nip, name, file_path FROM barcode_pengawas"
+    );
 
-    res.json(dataWithCorrectPath);
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error fetching data", error);
+    res.status(500).json({
+      error: "Terjadi kesalahan saat mengambil data",
+    });
+  }
+});
+
+app.get("/kontraktor-ttd", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, jabatan, nama, nip, name, file_path FROM barcode_kontraktor"
+    );
+
+    res.json(result.rows);
   } catch (error) {
     console.error("Error fetching data", error);
     res.status(500).json({
@@ -104,7 +115,9 @@ app.get("/pengawas-ttd", async (req, res) => {
 
 app.get("/kontraktor", async (req, res) => {
   try {
-    const result = await pool.query("SELECT id, username FROM kontraktor_report");
+    const result = await pool.query(
+      "SELECT id, username FROM kontraktor_report"
+    );
     res.json(result.rows);
   } catch (error) {
     console.error("Error fetching data", error);
@@ -895,12 +908,15 @@ app.get("/admins/:id", async (req, res) => {
   }
 
   try {
-    const result = await pool.query("SELECT * FROM admin_report WHERE id = $1", [id]);
+    const result = await pool.query(
+      "SELECT * FROM admin_report WHERE id = $1",
+      [id]
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Admin tidak ditemukan" });
     }
 
-   const userData = result.rows[0];
+    const userData = result.rows[0];
     console.log("Data yang dikirim ke client:", userData);
     res.json(userData);
   } catch (error) {
@@ -1207,8 +1223,8 @@ app.post("/login", async (req, res) => {
       query = "SELECT * FROM admin_report WHERE username = $1";
     } else if (role === "user") {
       query = "SELECT * FROM user_report WHERE username = $1";
-    } else if (role === "kontraktor"){
-      query = "SELECT * FROM kontraktor_report WHERE username = $1"
+    } else if (role === "kontraktor") {
+      query = "SELECT * FROM kontraktor_report WHERE username = $1";
     } else {
       return res
         .status(400)
@@ -1249,9 +1265,9 @@ app.post("/login", async (req, res) => {
   }
 });
 
-//Approve dan Reject Pengawas (Produksi)
+//Approve dan Reject Pengawas (Produksi) (Pengawas)
 app.post("/update-reject-reason", async (req, res) => {
-  const { operation_report_id, alasan_reject} = req.body;
+  const { operation_report_id, alasan_reject } = req.body;
 
   const client = await pool.connect();
 
@@ -1260,7 +1276,9 @@ app.post("/update-reject-reason", async (req, res) => {
 
     // Validasi input
     if (!operation_report_id || !alasan_reject) {
-      throw new Error("Data tidak lengkap. Pastikan operation_report_id dan alasan_reject diisi.");
+      throw new Error(
+        "Data tidak lengkap. Pastikan operation_report_id dan alasan_reject diisi."
+      );
     }
 
     // Update alasan_reject pada production_report
@@ -1270,7 +1288,9 @@ app.post("/update-reject-reason", async (req, res) => {
     );
 
     if (result.rowCount === 0) {
-      throw new Error("Tidak ada laporan produksi ditemukan dengan ID tersebut.");
+      throw new Error(
+        "Tidak ada laporan produksi ditemukan dengan ID tersebut."
+      );
     }
 
     await client.query("COMMIT");
@@ -1279,7 +1299,8 @@ app.post("/update-reject-reason", async (req, res) => {
     await client.query("ROLLBACK");
     console.error("Error updating reject reason:", error);
     res.status(500).json({
-      error: error.message || "Terjadi kesalahan saat memperbarui alasan reject.",
+      error:
+        error.message || "Terjadi kesalahan saat memperbarui alasan reject.",
     });
   } finally {
     client.release();
@@ -1287,17 +1308,17 @@ app.post("/update-reject-reason", async (req, res) => {
 });
 
 app.post("/update-approve-reason", async (req, res) => {
-  const { operation_report_id, kontraktor, name_pengawas, file_pengawas} = req.body;
+  const {
+    operation_report_id,
+    kontraktor,
+    name_pengawas,
+    file_pengawas,
+  } = req.body;
 
   const client = await pool.connect();
 
   try {
     await client.query("BEGIN");
-
-    // Validasi input
-    if (!operation_report_id || !kontraktor || !name_pengawas || !file_pengawas) {
-      throw new Error("Data tidak lengkap. Pastikan operation_report_id, kontraktor, name_pengawas, dan file_pengawas diisi.");
-    }
 
     // Update alasan_reject pada production_report
     const result = await client.query(
@@ -1306,14 +1327,16 @@ app.post("/update-approve-reason", async (req, res) => {
     );
 
     if (result.rowCount === 0) {
-      throw new Error("Tidak ada laporan produksi ditemukan dengan ID tersebut.");
+      throw new Error(
+        "Tidak ada laporan produksi ditemukan dengan ID tersebut."
+      );
     }
 
     await client.query("COMMIT");
     res.status(200).json({ message: "approve berhasil diperbarui." });
   } catch (error) {
     await client.query("ROLLBACK");
-    console.error("Error updating reject reason:", error);
+    console.error("Error updating approve reason:", error);
     res.status(500).json({
       error: error.message || "Terjadi kesalahan saat memperbarui approve.",
     });
@@ -1322,9 +1345,9 @@ app.post("/update-approve-reason", async (req, res) => {
   }
 });
 
-//Approve dan Reject Jam Jalan
+//Approve dan Reject Jam Jalan (Produksi)
 app.post("/update-reject-hourmeter", async (req, res) => {
-  const { operation_report_id, alasan_reject} = req.body;
+  const { operation_report_id, alasan_reject } = req.body;
 
   const client = await pool.connect();
 
@@ -1333,7 +1356,9 @@ app.post("/update-reject-hourmeter", async (req, res) => {
 
     // Validasi input
     if (!operation_report_id || !alasan_reject) {
-      throw new Error("Data tidak lengkap. Pastikan operation_report_id dan alasan_reject diisi.");
+      throw new Error(
+        "Data tidak lengkap. Pastikan operation_report_id dan alasan_reject diisi."
+      );
     }
 
     // Update alasan_reject pada production_report
@@ -1343,7 +1368,9 @@ app.post("/update-reject-hourmeter", async (req, res) => {
     );
 
     if (result.rowCount === 0) {
-      throw new Error("Tidak ada laporan jam jalan ditemukan dengan ID tersebut.");
+      throw new Error(
+        "Tidak ada laporan jam jalan ditemukan dengan ID tersebut."
+      );
     }
 
     await client.query("COMMIT");
@@ -1352,7 +1379,203 @@ app.post("/update-reject-hourmeter", async (req, res) => {
     await client.query("ROLLBACK");
     console.error("Error updating reject reason:", error);
     res.status(500).json({
-      error: error.message || "Terjadi kesalahan saat memperbarui alasan reject.",
+      error:
+        error.message || "Terjadi kesalahan saat memperbarui alasan reject.",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/update-approve-hourmeter", async (req, res) => {
+  const {
+    operation_report_id,
+    kontraktor,
+    name_pengawas,
+    file_pengawas,
+  } = req.body;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const result = await client.query(
+      "UPDATE hourmeter_report SET proses_pengawas = 'Approved Pengawas', kontraktor = $1, name_pengawas = $2, file_pengawas = $3 WHERE operation_report_id = $4",
+      [kontraktor, name_pengawas, file_pengawas, operation_report_id]
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error(
+        "Tidak ada laporan jam jalan ditemukan dengan ID tersebut."
+      );
+    }
+
+    await client.query("COMMIT");
+    res.status(200).json({ message: "approve berhasil diperbarui." });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error updating approve reason:", error);
+    res.status(500).json({
+      error: error.message || "Terjadi kesalahan saat memperbarui approve.",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+//Approve dan Reject Pengawas (Produksi) (Kontraktor)
+app.post("/update-reject-kontraktor", async (req, res) => {
+  const { operation_report_id, alasan_reject } = req.body;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Validasi input
+    if (!operation_report_id || !alasan_reject) {
+      throw new Error(
+        "Data tidak lengkap. Pastikan operation_report_id dan alasan_reject diisi."
+      );
+    }
+
+    // Update alasan_reject pada production_report
+    const result = await client.query(
+      "UPDATE production_report SET alasan_reject = $1, proses_kontraktor = 'Rejected Kontraktor' WHERE operation_report_id = $2",
+      [alasan_reject, operation_report_id]
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error(
+        "Tidak ada laporan produksi ditemukan dengan ID tersebut."
+      );
+    }
+
+    await client.query("COMMIT");
+    res.status(200).json({ message: "Alasan reject berhasil diperbarui." });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error updating reject reason:", error);
+    res.status(500).json({
+      error:
+        error.message || "Terjadi kesalahan saat memperbarui alasan reject.",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/update-approve-kontraktor", async (req, res) => {
+  const {
+    operation_report_id,
+    name_kontraktor,
+    file_kontraktor,
+  } = req.body;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Update alasan_reject pada production_report
+    const result = await client.query(
+      "UPDATE production_report SET proses_kontraktor = 'Approved Kontraktor', name_kontraktor = $1, file_kontraktor = $2 WHERE operation_report_id = $3",
+      [name_kontraktor, file_kontraktor, operation_report_id]
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error(
+        "Tidak ada laporan produksi ditemukan dengan ID tersebut."
+      );
+    }
+
+    await client.query("COMMIT");
+    res.status(200).json({ message: "approve berhasil diperbarui." });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error updating approve reason:", error);
+    res.status(500).json({
+      error: error.message || "Terjadi kesalahan saat memperbarui approve.",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+//Approve dan Reject Jam Jalan
+app.post("/update-reject-hourmeter-kontraktor", async (req, res) => {
+  const { operation_report_id, alasan_reject } = req.body;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Validasi input
+    if (!operation_report_id || !alasan_reject) {
+      throw new Error(
+        "Data tidak lengkap. Pastikan operation_report_id dan alasan_reject diisi."
+      );
+    }
+
+    // Update alasan_reject pada production_report
+    const result = await client.query(
+      "UPDATE hourmeter_report SET alasan_reject = $1, proses_kontraktor = 'Rejected Kontraktor' WHERE operation_report_id = $2",
+      [alasan_reject, operation_report_id]
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error(
+        "Tidak ada laporan jam jalan ditemukan dengan ID tersebut."
+      );
+    }
+
+    await client.query("COMMIT");
+    res.status(200).json({ message: "Alasan reject berhasil diperbarui." });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error updating reject reason:", error);
+    res.status(500).json({
+      error:
+        error.message || "Terjadi kesalahan saat memperbarui alasan reject.",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/update-approve-hourmeter-kontraktor", async (req, res) => {
+  const {
+    operation_report_id,
+    kontraktor,
+    name_pengawas,
+    file_pengawas,
+  } = req.body;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const result = await client.query(
+      "UPDATE hourmeter_report SET proses_kontraktor = 'Approved Kontraktor', kontraktor = $1, name_pengawas = $2, file_pengawas = $3 WHERE operation_report_id = $4",
+      [kontraktor, name_pengawas, file_pengawas, operation_report_id]
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error(
+        "Tidak ada laporan jam jalan ditemukan dengan ID tersebut."
+      );
+    }
+
+    await client.query("COMMIT");
+    res.status(200).json({ message: "approve berhasil diperbarui." });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error updating approve reason:", error);
+    res.status(500).json({
+      error: error.message || "Terjadi kesalahan saat memperbarui approve.",
     });
   } finally {
     client.release();
@@ -1361,7 +1584,7 @@ app.post("/update-reject-hourmeter", async (req, res) => {
 
 //Edit dan Okay Produksi
 app.post("/okay-produksi", async (req, res) => {
-  const {operation_report_id, id} = req.body;
+  const { operation_report_id, id } = req.body;
 
   const client = await pool.connect();
 
@@ -1370,7 +1593,9 @@ app.post("/okay-produksi", async (req, res) => {
 
     // Validasi input
     if (!id || !operation_report_id) {
-      throw new Error("Data tidak lengkap. Pastikan id dan operation_report_id diisi.");
+      throw new Error(
+        "Data tidak lengkap. Pastikan id dan operation_report_id diisi."
+      );
     }
 
     // Update alasan_reject pada production_report
@@ -1380,7 +1605,9 @@ app.post("/okay-produksi", async (req, res) => {
     );
 
     if (result.rowCount === 0) {
-      throw new Error("Tidak ada laporan produksi ditemukan dengan ID tersebut.");
+      throw new Error(
+        "Tidak ada laporan produksi ditemukan dengan ID tersebut."
+      );
     }
 
     await client.query("COMMIT");
@@ -1389,7 +1616,8 @@ app.post("/okay-produksi", async (req, res) => {
     await client.query("ROLLBACK");
     console.error("Error updating reject reason:", error);
     res.status(500).json({
-      error: error.message || "Terjadi kesalahan saat memperbarui laporan produksi.",
+      error:
+        error.message || "Terjadi kesalahan saat memperbarui laporan produksi.",
     });
   } finally {
     client.release();
@@ -1404,5 +1632,5 @@ app._router.stack.forEach(function (r) {
 });
 
 app.listen(port, () => {
-  console.log(`Server running at http://192.168.1.62:${port}`);
+  console.log(`Server running at http://192.168.1.91:${port}`);
 });
