@@ -514,7 +514,7 @@ app.post("/production-reports", async (req, res) => {
 
 app.put("/production-reports/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  const { alat, timbunan, material, jarak, tipe, ritase } = req.body;
+  const { alat, timbunan, material, jarak, tipe, ritase, excecutor, tipe2, ritase2, muatan, volume, total_ritase, muatan2, volume2, total_volume } = req.body;
 
   const client = await pool.connect();
 
@@ -532,8 +532,8 @@ app.put("/production-reports/:id", async (req, res) => {
 
     // Update production_report
     await client.query(
-      "UPDATE production_report SET alat = $1, timbunan = $2, material = $3, jarak = $4, tipe = $5, ritase = $6 WHERE id = $7",
-      [alat, timbunan, material, jarak, tipe, ritase, id]
+      "UPDATE production_report SET alat = $1, timbunan = $2, material = $3, jarak = $4, tipe = $5, ritase = $6, proses_admin = 'Uploaded', proses_pengawas = null, proses_kontraktor = null, alasan_reject = null, excecutor = $7, tipe2 = $8, ritase2 = $9, muatan = $10, volume = $11, total_ritase = $12, kontraktor = null, muatan2 = $13, volume2 = $14, total_volume = $15, name_pengawas = null, file_pengawas = null, name_kontraktor = null, file_kontraktor = null WHERE id = $16",
+      [alat, timbunan, material, jarak, tipe, ritase, excecutor, tipe2, ritase2, muatan, volume, total_ritase, muatan2, volume2, total_volume, id]
     );
 
     await client.query("COMMIT");
@@ -1324,6 +1324,83 @@ app.post("/update-approve-reason", async (req, res) => {
     const result = await client.query(
       "UPDATE production_report SET proses_pengawas = 'Approved Pengawas', kontraktor = $1, name_pengawas = $2, file_pengawas = $3 WHERE operation_report_id = $4",
       [kontraktor, name_pengawas, file_pengawas, operation_report_id]
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error(
+        "Tidak ada laporan produksi ditemukan dengan ID tersebut."
+      );
+    }
+
+    await client.query("COMMIT");
+    res.status(200).json({ message: "approve berhasil diperbarui." });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error updating approve reason:", error);
+    res.status(500).json({
+      error: error.message || "Terjadi kesalahan saat memperbarui approve.",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+//Approve dan Reject setelah di reject kontraktor (Produksi)
+app.post("/update-reject-reason-produksi", async (req, res) => {
+  const { operation_report_id, alasan_reject } = req.body;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Validasi input
+    if (!operation_report_id || !alasan_reject) {
+      throw new Error(
+        "Data tidak lengkap. Pastikan operation_report_id dan alasan_reject diisi."
+      );
+    }
+
+    // Update alasan_reject pada production_report
+    const result = await client.query(
+      "UPDATE production_report SET proses_pengawas = 'Rejected Pengawas', proses_kontraktor = null, alasan_reject = $1, kontraktor = null, name_pengawas = null, file_pengawas = null WHERE operation_report_id = $2",
+      [alasan_reject, operation_report_id]
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error(
+        "Tidak ada laporan produksi ditemukan dengan ID tersebut."
+      );
+    }
+
+    await client.query("COMMIT");
+    res.status(200).json({ message: "Alasan reject berhasil diperbarui." });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error updating reject reason:", error);
+    res.status(500).json({
+      error:
+        error.message || "Terjadi kesalahan saat memperbarui alasan reject.",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/update-approve-reason-produksi", async (req, res) => {
+  const {
+    operation_report_id,
+  } = req.body;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Update alasan_reject pada production_report
+    const result = await client.query(
+      "UPDATE production_report SET proses_kontraktor = null, alasan_reject = null WHERE operation_report_id = $1",
+      [operation_report_id]
     );
 
     if (result.rowCount === 0) {
