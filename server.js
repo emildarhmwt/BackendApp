@@ -323,13 +323,11 @@ app.post("/operation-reports", async (req, res) => {
 
 //Route untuk mengambil data dari database
 app.get("/reports", async (req, res) => {
-  const { status, startDate, endDate, grup, lokasi } = req.query;
+  const { status, startDate, endDate } = req.query;
   console.log("Query params received:", {
     status,
     startDate,
     endDate,
-    grup,
-    lokasi,
   });
 
   try {
@@ -367,15 +365,6 @@ app.get("/reports", async (req, res) => {
     } else if (endDate) {
       query += ` AND op.tanggal <= $${paramCount++}`;
       params.push(endDate);
-    }
-
-    if (grup) {
-      query += ` AND op.grup ILIKE $${paramCount++}`;
-      params.push(`%${grup}%`);
-    }
-    if (lokasi) {
-      query += ` AND op.lokasi ILIKE $${paramCount++}`;
-      params.push(`%${lokasi}%`);
     }
 
     console.log("Final query:", query);
