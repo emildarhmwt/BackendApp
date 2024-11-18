@@ -514,7 +514,23 @@ app.post("/production-reports", async (req, res) => {
 
 app.put("/production-reports/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  const { alat, timbunan, material, jarak, tipe, ritase, excecutor, tipe2, ritase2, muatan, volume, total_ritase, muatan2, volume2, total_volume } = req.body;
+  const {
+    alat,
+    timbunan,
+    material,
+    jarak,
+    tipe,
+    ritase,
+    excecutor,
+    tipe2,
+    ritase2,
+    muatan,
+    volume,
+    total_ritase,
+    muatan2,
+    volume2,
+    total_volume,
+  } = req.body;
 
   const client = await pool.connect();
 
@@ -533,7 +549,24 @@ app.put("/production-reports/:id", async (req, res) => {
     // Update production_report
     await client.query(
       "UPDATE production_report SET alat = $1, timbunan = $2, material = $3, jarak = $4, tipe = $5, ritase = $6, proses_admin = 'Uploaded', proses_pengawas = null, proses_kontraktor = null, alasan_reject = null, excecutor = $7, tipe2 = $8, ritase2 = $9, muatan = $10, volume = $11, total_ritase = $12, kontraktor = null, muatan2 = $13, volume2 = $14, total_volume = $15, name_pengawas = null, file_pengawas = null, name_kontraktor = null, file_kontraktor = null WHERE id = $16",
-      [alat, timbunan, material, jarak, tipe, ritase, excecutor, tipe2, ritase2, muatan, volume, total_ritase, muatan2, volume2, total_volume, id]
+      [
+        alat,
+        timbunan,
+        material,
+        jarak,
+        tipe,
+        ritase,
+        excecutor,
+        tipe2,
+        ritase2,
+        muatan,
+        volume,
+        total_ritase,
+        muatan2,
+        volume2,
+        total_volume,
+        id,
+      ]
     );
 
     await client.query("COMMIT");
@@ -775,8 +808,13 @@ app.put("/hourmeter-reports/:id", async (req, res) => {
     no_operator,
     hujan,
     ket,
+    tipe_unit,
+    jam_operasi,
+    no_order,
+    total_hm,
   } = req.body;
 
+  console.log("Data received for update:", req.body);
   const client = await pool.connect();
 
   try {
@@ -791,21 +829,50 @@ app.put("/hourmeter-reports/:id", async (req, res) => {
       throw new Error("Hourmeter report tidak ditemukan");
     }
 
-    // Update hourmeter_report
-    await client.query(
-      "UPDATE hourmeter_report SET equipment = $1, hm_awal = $2, hm_akhir = $3, jam_lain = $4, breakdown = $5, no_operator = $6, hujan = $7, ket = $8 WHERE id = $9",
-      [
-        equipment,
-        hm_awal,
-        hm_akhir,
-        jam_lain,
-        breakdown,
-        no_operator,
-        hujan,
-        ket,
-        id,
-      ]
-    );
+    const updateQuery = `
+      UPDATE hourmeter_report 
+      SET equipment = $1, hm_awal = $2, hm_akhir = $3, jam_lain = $4, breakdown = $5, 
+          no_operator = $6, hujan = $7, ket = $8, proses_admin = 'Uploaded', 
+          proses_pengawas = null, proses_kontraktor = null, alasan_reject = null, 
+          tipe_unit = $9, total_hm = $10, jam_operasi = $11, no_order = $12, 
+          kontraktor = null, name_pengawas = null, file_pengawas = null, 
+          name_kontraktor = null, file_kontraktor = null 
+      WHERE id = $13
+    `;
+    console.log("Executing update query:", updateQuery);
+
+    const result = await client.query(updateQuery, [
+      equipment,
+      hm_awal,
+      hm_akhir,
+      jam_lain,
+      breakdown,
+      no_operator,
+      hujan,
+      ket,
+      tipe_unit,
+      total_hm,
+      jam_operasi,
+      no_order,
+      id,
+    ]);
+    console.log("Rows affected:", result.rowCount);
+
+    console.log("Parameters sent to query:", [
+      equipment,
+      hm_awal,
+      hm_akhir,
+      jam_lain,
+      breakdown,
+      no_operator,
+      hujan,
+      ket,
+      tipe_unit,
+      total_hm,
+      jam_operasi,
+      no_order,
+      id,
+    ]);
 
     await client.query("COMMIT");
     res.json({ message: "Hourmeter report berhasil diperbarui" });
@@ -1265,6 +1332,7 @@ app.post("/login", async (req, res) => {
   }
 });
 
+//Pengawas
 //Approve dan Reject Pengawas (Produksi) (Pengawas)
 app.post("/update-reject-reason", async (req, res) => {
   const { operation_report_id, alasan_reject } = req.body;
@@ -1388,9 +1456,7 @@ app.post("/update-reject-reason-produksi", async (req, res) => {
 });
 
 app.post("/update-approve-reason-produksi", async (req, res) => {
-  const {
-    operation_report_id,
-  } = req.body;
+  const { operation_report_id } = req.body;
 
   const client = await pool.connect();
 
@@ -1422,7 +1488,82 @@ app.post("/update-approve-reason-produksi", async (req, res) => {
   }
 });
 
-//Approve dan Reject Jam Jalan (Produksi)
+//Approve dan Reject setelah di reject kontraktor (Jam Jalan)
+app.post("/update-reject-reason-jamjalan", async (req, res) => {
+  const { operation_report_id, alasan_reject } = req.body;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Validasi input
+    if (!operation_report_id || !alasan_reject) {
+      throw new Error(
+        "Data tidak lengkap. Pastikan operation_report_id dan alasan_reject diisi."
+      );
+    }
+
+    // Update alasan_reject pada production_report
+    const result = await client.query(
+      "UPDATE hourmeter_report SET proses_pengawas = 'Rejected Pengawas', proses_kontraktor = null, alasan_reject = $1, kontraktor = null, name_pengawas = null, file_pengawas = null WHERE operation_report_id = $2",
+      [alasan_reject, operation_report_id]
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error(
+        "Tidak ada laporan jam jalan ditemukan dengan ID tersebut."
+      );
+    }
+
+    await client.query("COMMIT");
+    res.status(200).json({ message: "Alasan reject berhasil diperbarui." });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error updating reject reason:", error);
+    res.status(500).json({
+      error:
+        error.message || "Terjadi kesalahan saat memperbarui alasan reject.",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/update-approve-reason-jamjalan", async (req, res) => {
+  const { operation_report_id } = req.body;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Update alasan_reject pada production_report
+    const result = await client.query(
+      "UPDATE hourmeter_report SET proses_kontraktor = null, alasan_reject = null WHERE operation_report_id = $1",
+      [operation_report_id]
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error(
+        "Tidak ada laporan jam jalan ditemukan dengan ID tersebut."
+      );
+    }
+
+    await client.query("COMMIT");
+    res.status(200).json({ message: "approve berhasil diperbarui." });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error updating approve reason:", error);
+    res.status(500).json({
+      error: error.message || "Terjadi kesalahan saat memperbarui approve.",
+    });
+  } finally {
+    client.release();
+  }
+});
+
+//Approve dan Reject Jam Jalan (Pengawas)
 app.post("/update-reject-hourmeter", async (req, res) => {
   const { operation_report_id, alasan_reject } = req.body;
 
@@ -1501,6 +1642,7 @@ app.post("/update-approve-hourmeter", async (req, res) => {
   }
 });
 
+//Kontraktor
 //Approve dan Reject Pengawas (Produksi) (Kontraktor)
 app.post("/update-reject-kontraktor", async (req, res) => {
   const { operation_report_id, alasan_reject } = req.body;
@@ -1544,11 +1686,7 @@ app.post("/update-reject-kontraktor", async (req, res) => {
 });
 
 app.post("/update-approve-kontraktor", async (req, res) => {
-  const {
-    operation_report_id,
-    name_kontraktor,
-    file_kontraktor,
-  } = req.body;
+  const { operation_report_id, name_kontraktor, file_kontraktor } = req.body;
 
   const client = await pool.connect();
 
@@ -1580,7 +1718,7 @@ app.post("/update-approve-kontraktor", async (req, res) => {
   }
 });
 
-//Approve dan Reject Jam Jalan
+//Approve dan Reject (Jam Jalan)
 app.post("/update-reject-hourmeter-kontraktor", async (req, res) => {
   const { operation_report_id, alasan_reject } = req.body;
 
@@ -1623,12 +1761,7 @@ app.post("/update-reject-hourmeter-kontraktor", async (req, res) => {
 });
 
 app.post("/update-approve-hourmeter-kontraktor", async (req, res) => {
-  const {
-    operation_report_id,
-    kontraktor,
-    name_pengawas,
-    file_pengawas,
-  } = req.body;
+  const { operation_report_id, name_kontraktor, file_kontraktor } = req.body;
 
   const client = await pool.connect();
 
@@ -1636,8 +1769,8 @@ app.post("/update-approve-hourmeter-kontraktor", async (req, res) => {
     await client.query("BEGIN");
 
     const result = await client.query(
-      "UPDATE hourmeter_report SET proses_kontraktor = 'Approved Kontraktor', kontraktor = $1, name_pengawas = $2, file_pengawas = $3 WHERE operation_report_id = $4",
-      [kontraktor, name_pengawas, file_pengawas, operation_report_id]
+      "UPDATE hourmeter_report SET proses_kontraktor = 'Approved Kontraktor', name_kontraktor = $1, file_kontraktor = $2 WHERE operation_report_id = $3",
+      [name_kontraktor, file_kontraktor, operation_report_id]
     );
 
     if (result.rowCount === 0) {
@@ -1659,7 +1792,7 @@ app.post("/update-approve-hourmeter-kontraktor", async (req, res) => {
   }
 });
 
-//Edit dan Okay Produksi
+//Okay Produksi dan Jam Jalan
 app.post("/okay-produksi", async (req, res) => {
   const { operation_report_id, id } = req.body;
 
@@ -1701,6 +1834,48 @@ app.post("/okay-produksi", async (req, res) => {
   }
 });
 
+app.post("/okay-hourmeter", async (req, res) => {
+  const { operation_report_id, id } = req.body;
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Validasi input
+    if (!id || !operation_report_id) {
+      throw new Error(
+        "Data tidak lengkap. Pastikan id dan operation_report_id diisi."
+      );
+    }
+
+    // Update alasan_reject pada production_report
+    const result = await client.query(
+      "UPDATE hourmeter_report SET operation_report_id = $1, proses_pengawas = null, proses_kontraktor = null, alasan_reject = null, kontraktor = null, name_pengawas = null, file_pengawas = null, name_kontraktor = null, file_kontraktor = null WHERE id = $2",
+      [operation_report_id, id]
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error(
+        "Tidak ada laporan jam jalan ditemukan dengan ID tersebut."
+      );
+    }
+
+    await client.query("COMMIT");
+    res.status(200).json({ message: "Laporan jam jalan berhasil diperbarui." });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error updating reject reason:", error);
+    res.status(500).json({
+      error:
+        error.message ||
+        "Terjadi kesalahan saat memperbarui laporan jam jalan.",
+    });
+  } finally {
+    client.release();
+  }
+});
+
 console.log("Registered routes:");
 app._router.stack.forEach(function (r) {
   if (r.route && r.route.path) {
@@ -1709,5 +1884,5 @@ app._router.stack.forEach(function (r) {
 });
 
 app.listen(port, () => {
-  console.log(`Server running at http://192.168.1.91:${port}`);
+  console.log(`Server running at http://192.168.1.122:${port}`);
 });
